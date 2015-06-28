@@ -10,7 +10,7 @@ u32 interrupt_line;
 dht11_state dht11_current_state = DHT11_NONE;
 u16 dht11_pulse_lengths[6];
 
-bool data[40];
+bool dht11_data[40];
 u8 data_pos = 0;
 
 u8 last_temperature = 0;
@@ -136,9 +136,9 @@ bool dht11_check_tolerance(u32 timer) {
     if ((timer >= min) && (timer <= max)) {
         return true;
     }
-    char tab[50];
-    sprintf(tab, "Error, expected: %d at position %d, received: %u %d\r\n", expected, data_pos, (unsigned int)timer, dht11_current_state);
-    printf(tab);
+//    char tab[50];
+//    sprintf(tab, "Error, expected: %d at position %d, received: %u %d\r\n", expected, data_pos, (unsigned int)timer, dht11_current_state);
+//    printf(tab);
     return false;
 }
 
@@ -146,17 +146,17 @@ void dht11_trigger_state_machine(u32 timer, u8 bit) {
     u8 middle_value = (dht11_pulse_lengths[DHT11_RELEASE_0] + dht11_pulse_lengths[DHT11_RELEASE_1]) / 2;
     dht11_check_tolerance(timer);
 
-    char tab[10];
-    sprintf(tab, "%u\r\n", (unsigned int)timer);
+//    char tab[10];
+//    sprintf(tab, "%u\r\n", (unsigned int)timer);
 
     switch(dht11_current_state) {
         case DHT11_NONE:
             if (bit) {
                 break; // wrong state
             }
-            GPIO_WriteBit(GPIOC, GPIO_Pin_13, Bit_SET);
+//            GPIO_WriteBit(GPIOC, GPIO_Pin_13, Bit_SET);
             dht11_current_state = DHT11_INIT_PULL_DOWN;
-            GPIO_WriteBit(GPIOC, GPIO_Pin_13, Bit_RESET);
+//            GPIO_WriteBit(GPIOC, GPIO_Pin_13, Bit_RESET);
             break;
         case DHT11_INIT_PULL_DOWN:
             dht11_current_state = DHT11_INIT_RELEASE;
@@ -172,9 +172,9 @@ void dht11_trigger_state_machine(u32 timer, u8 bit) {
         case DHT11_RELEASE_0:
         case DHT11_RELEASE_1:
             if (timer < middle_value) {
-                data[data_pos] = 0;
+                dht11_data[data_pos] = 0;
             } else {
-                data[data_pos] = 1;
+                dht11_data[data_pos] = 1;
             }
             ++data_pos;
 
@@ -189,9 +189,9 @@ void dht11_trigger_state_machine(u32 timer, u8 bit) {
             break;
 
         case DHT11_EOT:
-            GPIO_WriteBit(GPIOC, GPIO_Pin_13, Bit_SET);
+//            GPIO_WriteBit(GPIOC, GPIO_Pin_13, Bit_SET);
             dht11_current_state = DHT11_NONE;
-            GPIO_WriteBit(GPIOC, GPIO_Pin_13, Bit_RESET);
+//            GPIO_WriteBit(GPIOC, GPIO_Pin_13, Bit_RESET);
             break;
         default:
             break;
@@ -211,18 +211,18 @@ void dht11_decode_data() {
 
     u8 temp_integral = 0, temp_decimal = 0, rh_integral = 0, rh_decimal = 0, checksum = 0;
     for (i = 0; i < 8; ++i) {
-        rh_integral     |= data[i]      << (7 - i);
-        rh_decimal      |= data[8  + i] << (7 - i);
-        temp_integral   |= data[16 + i] << (7 - i);
-        temp_decimal    |= data[24 + i] << (7 - i);
-        checksum        |= data[32 + i] << (7 - i);
+        rh_integral     |= dht11_data[i]      << (7 - i);
+        rh_decimal      |= dht11_data[8  + i] << (7 - i);
+        temp_integral   |= dht11_data[16 + i] << (7 - i);
+        temp_decimal    |= dht11_data[24 + i] << (7 - i);
+        checksum        |= dht11_data[32 + i] << (7 - i);
     }
 //    sprintf(tab, "%d.%d %d.%d %d\r\n", temp_integral, temp_decimal, rh_integral, rh_decimal, checksum);
     if (temp_integral + temp_decimal + rh_integral + rh_decimal == checksum) {
         last_temperature = temp_integral;
         last_relative_humidity = rh_integral;
     } else {
-        printf("Checksum incorrect\r\n");
+//        printf("Checksum incorrect\r\n");
         last_temperature = 0;
         last_relative_humidity = 0;
     }

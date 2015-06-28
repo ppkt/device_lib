@@ -21,18 +21,18 @@ u8 en        = 1 << 2;
 u8 rw        = 1 << 1;
 u8 rs        = 1 << 0;
 TIM_TypeDef *timer;
-uint8_t data[4] = {0x00, 0x00, 0x00};
+uint8_t hd44780_data[4] = {0x00, 0x00, 0x00, 0x00};
 
 void hd44780_send(u8 cmd, bool set_rs) {
 	u8 rs_ = 0;
 	if (set_rs)
 		rs_ = rs;
 
-	data[0] = (cmd & 0xF0) | backlight | en | rs_;
-	data[1] = (cmd & 0xF0) | backlight;
-	data[2] = (cmd & 0x0F) << 4 | backlight | en | rs_;
-	data[3] = (cmd & 0x0F) << 4 | backlight;
-	I2C_Master_BufferWrite(I2C1, data, 4, Polling, hd44780_address << 1);
+	hd44780_data[0] = (cmd & 0xF0) | backlight | en | rs_;
+	hd44780_data[1] = (cmd & 0xF0) | backlight;
+	hd44780_data[2] = (cmd & 0x0F) << 4 | backlight | en | rs_;
+	hd44780_data[3] = (cmd & 0x0F) << 4 | backlight;
+	I2C_Master_BufferWrite(I2C1, hd44780_data, 4, Polling, hd44780_address << 1);
 }
 
 void hd44780_char(u8 cmd) {
@@ -54,9 +54,9 @@ void hd44780_print(char *string) {
 
 void hd44780_backlight(bool new_value) {
 	backlight = new_value << 3;
-	I2C_Master_BufferRead(I2C1, data, 1, Polling, hd44780_address << 1);
-	data[0] |= backlight;
-	I2C_Master_BufferWrite(I2C1, data, 1, Polling, hd44780_address << 1);
+	I2C_Master_BufferRead(I2C1, hd44780_data, 1, Polling, hd44780_address << 1);
+	hd44780_data[0] |= backlight;
+	I2C_Master_BufferWrite(I2C1, hd44780_data, 1, Polling, hd44780_address << 1);
 }
 
 void hd44780_go_to_line(u8 line) {
@@ -85,7 +85,7 @@ void hd44780_go_to(u8 row, u8 col) {
         hd44780_cmd(0x14);
 }
 
-void hd44780_cgram_write(u8 pos, u8 data[8]) {
+void hd44780_cgram_write(u8 pos, u8 data_[8]) {
 	if (pos > 7) {
 		return;
 	}
@@ -93,7 +93,7 @@ void hd44780_cgram_write(u8 pos, u8 data[8]) {
 	hd44780_cmd(pos);
 	u8 i;
 	for (i = 0; i < 8; ++i) {
-		hd44780_send(data[i], true);
+		hd44780_send(data_[i], true);
 	}
 }
 
@@ -101,14 +101,14 @@ void hd44780_init(TIM_TypeDef *t) {
 	timer = t;
 	// Setup clock
 	if (timer == TIM2)
-		RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
+            RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
 	else if (timer == TIM3)
 	    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
 	else
-		while(1){} // not implemented
+            while(1){} // not implemented
 	TIM_TimeBaseInitTypeDef TIM_InitStructure;
 	TIM_InitStructure.TIM_CounterMode = TIM_CounterMode_Up;
-	TIM_InitStructure.TIM_Prescaler = 72 - 1;
+	TIM_InitStructure.TIM_Prescaler = (SystemCoreClock) / 1000000 - 1;
 	TIM_InitStructure.TIM_Period = 10000 - 1; // Update event every 10000 us / 10 ms
 	TIM_InitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
 	TIM_InitStructure.TIM_RepetitionCounter = 0;
@@ -116,15 +116,18 @@ void hd44780_init(TIM_TypeDef *t) {
 	TIM_Cmd(timer, ENABLE);
 
 
-	data[0] = 0x00 | backlight;
-	data[1] = 0x00 | backlight;
+	hd44780_data[0] = 0x00 | backlight;
+	hd44780_data[1] = 0x00 | backlight;
 
 //	GPIO_SetBits(GPIOC, GPIO_Pin_8);
 //	delay_us(timer, 250);
 //	GPIO_ResetBits(GPIOC, GPIO_Pin_8);
 
+        // Init I2C
+        I2C_LowLevel_Init(I2C1);
+
 	// Reset all
-	I2C_Master_BufferWrite(I2C1, data, 1, Polling, hd44780_address << 1);
+	I2C_Master_BufferWrite(I2C1, hd44780_data, 1, Polling, hd44780_address << 1);
 
 	hd44780_cmd(0x03);
 	delay_us(timer, 5000);
@@ -139,12 +142,15 @@ void hd44780_init(TIM_TypeDef *t) {
 	hd44780_cmd(0x0E); // turn on display, set solid cursor
 	hd44780_cmd(0x0C); // turn on display, set invisiblecursor
 
-	hd44780_cgram_write(0, (u8[]){0,10,31,31,14,4,0,0});
-	hd44780_cgram_write(1, (u8[]){0,10,21,17,10,4,0,0});
+        u8 arr[] = {0,10,31,31,14,4,0,0};
+        u8 arr2[]= {0,10,21,17,10,4,0,0};
+
+	hd44780_cgram_write(0, arr);
+	hd44780_cgram_write(1, arr2);
 
 	hd44780_cmd(0x01); // clear display, go to 0x0
 
-//	hd44780_backlight(true);
+	hd44780_backlight(true);
 //	hd44780_print("Linia 0");
 //	hd44780_go_to_line(1);
 //	hd44780_print("Linia 1");
