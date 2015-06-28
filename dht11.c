@@ -13,6 +13,9 @@ u16 dht11_pulse_lengths[6];
 bool data[40];
 u8 data_pos = 0;
 
+u8 last_temperature = 0;
+u8 last_relative_humidity = 0;
+
 static void dht11_delay_us(unsigned int time) {
 	timer->CNT = 0;
 	time -= 3;
@@ -134,7 +137,7 @@ bool dht11_check_tolerance(u32 timer) {
         return true;
     }
     char tab[50];
-    sprintf(tab, "Error, expected: %d at position %d, received: %d %d\r\n", expected, data_pos, timer, dht11_current_state);
+    sprintf(tab, "Error, expected: %d at position %d, received: %u %d\r\n", expected, data_pos, (unsigned int)timer, dht11_current_state);
     printf(tab);
     return false;
 }
@@ -144,7 +147,7 @@ void dht11_trigger_state_machine(u32 timer, u8 bit) {
     dht11_check_tolerance(timer);
 
     char tab[10];
-    sprintf(tab, "%d\r\n", timer);
+    sprintf(tab, "%u\r\n", (unsigned int)timer);
 
     switch(dht11_current_state) {
         case DHT11_NONE:
@@ -180,7 +183,7 @@ void dht11_trigger_state_machine(u32 timer, u8 bit) {
             if (data_pos == 40) {
                 data_pos = 0;
                 dht11_current_state = DHT11_EOT;
-                dht11_print_data();
+                dht11_decode_data();
             }
 
             break;
@@ -195,17 +198,43 @@ void dht11_trigger_state_machine(u32 timer, u8 bit) {
     }
 }
 
-void dht11_print_data() {
+void dht11_decode_data() {
     u8 i;
-    char tab[43];
-    for (i = 0; i < 40; ++i) {
-        tab[i] = 48 + data[i];
-    }
-    tab[40] = '\r';
-    tab[41] = '\n';
-    tab[42] = 0;
-    printf(tab);
+//    char tab[43];
+//    for (i = 0; i < 40; ++i) {
+//        tab[i] = 48 + data[i];
+//    }
+//    tab[40] = '\r';
+//    tab[41] = '\n';
+//    tab[42] = 0;
+//    printf(tab);
 
+    u8 temp_integral = 0, temp_decimal = 0, rh_integral = 0, rh_decimal = 0, checksum = 0;
+    for (i = 0; i < 8; ++i) {
+        rh_integral     |= data[i]      << (7 - i);
+        rh_decimal      |= data[8  + i] << (7 - i);
+        temp_integral   |= data[16 + i] << (7 - i);
+        temp_decimal    |= data[24 + i] << (7 - i);
+        checksum        |= data[32 + i] << (7 - i);
+    }
+//    sprintf(tab, "%d.%d %d.%d %d\r\n", temp_integral, temp_decimal, rh_integral, rh_decimal, checksum);
+    if (temp_integral + temp_decimal + rh_integral + rh_decimal == checksum) {
+        last_temperature = temp_integral;
+        last_relative_humidity = rh_integral;
+    } else {
+        printf("Checksum incorrect\r\n");
+        last_temperature = 0;
+        last_relative_humidity = 0;
+    }
+//    printf(tab);
+}
+
+u8 dht11_get_temperature() {
+    return last_temperature;
+}
+
+u8 dht11_get_rh() {
+    return last_relative_humidity;
 }
 
 void EXTI9_5_IRQHandler(void) {

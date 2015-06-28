@@ -1,6 +1,7 @@
 #ifndef __DHT11_H__
 #define __DHT11_H__
 #include "stdbool.h"
+#include "stdio.h"
 
 #include "stm32f10x_gpio.h"
 #include "stm32f10x_rcc.h"
@@ -21,6 +22,8 @@ typedef enum {
 void dht11_init(GPIO_TypeDef *gpio_, u16 pin_, u8 source_pin_, TIM_TypeDef *timer_);
 void dht11_trigger_state_machine(u32 timer, u8 bit);
 bool dht11_reset_pulse();
-bool dht11_check_tolerance(u32 timer);
-void dht11_print_data();
+//bool dht11_check_tolerance(u32 timer);
+void dht11_decode_data();
+u8 dht11_get_temperature();
+u8 dht11_get_rh();
 #endif //__DHT11_H__
