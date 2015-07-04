@@ -94,8 +94,6 @@ u8 rf24l01_status(void) {
 }
 
 void rf24l01_write_register(u8 addr, u8 *tx_buffer, u8 bytes) {
-    u16 j;
-    for (j = 0; j < 200; ++j) {}
     tx[0] = W_REGISTER | addr;
     memcpy(tx+1, tx_buffer, bytes);
 
@@ -105,8 +103,6 @@ void rf24l01_write_register(u8 addr, u8 *tx_buffer, u8 bytes) {
 
 // Reads `bytes` bytes from `addr` to `rx_buffer`. Returns Status register
 u8 rf24l01_read_register(u8 addr, u8 *rx_buffer, u8 bytes) {
-    u16 j;
-    for (j = 0; j < 200; ++j) {}
     memset(tx, 0, bytes + 1);
     tx[0] = R_REGISTER | addr;
     spi_send(tx, rx_buffer, bytes + 1);
