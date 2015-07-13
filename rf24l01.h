@@ -47,19 +47,20 @@
 #define FIFO_STATUS 0x17
 
 typedef enum {
-    RF24L01_ROLE_TRANSMITTER,
+    RF24L01_ROLE_TRANSMITTER = 0,
     RF24L01_ROLE_RECEIVER
 } rf24l01_role;
 
 typedef struct {
     SPI_TypeDef *spi;
     TIM_TypeDef *timer;
+    u8 device_id;
 
 } rf24l01_context;
 
-rf24l01_context rf24l01_init(SPI_TypeDef *spi, rf24l01_role role);
+rf24l01_context rf24l01_init(u8 device_id, SPI_TypeDef *spi, TIM_TypeDef *timer, rf24l01_role role);
 u8 rf24l01_status(rf24l01_context ctx);
-void rf24l01_ce(bool new_state);
+void rf24l01_ce(rf24l01_context ctx, bool new_state);
 void rf24l01_reset(rf24l01_context ctx);
 
 void rf24l01_write_register(rf24l01_context ctx, u8 addr, u8 *tx_buffer, u8 bytes);

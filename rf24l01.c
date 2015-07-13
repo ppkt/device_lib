@@ -3,42 +3,98 @@
 u8 tx[32];
 u8 rx[32];
 
-void rf24l01_gpio_init() {
-    GPIO_InitTypeDef GPIO_InitStructure;
-
-    // Configure RF24 pins: CE, IRQ
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2;
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
-    GPIO_Init(GPIOA, &GPIO_InitStructure);
-
-
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
-    GPIO_Init(GPIOA, &GPIO_InitStructure);
-
-    rf24l01_ce(0);
-
-}
-
-void rf24l01_ce(bool new_state) {
-    if (new_state) {
-        GPIO_WriteBit(GPIOA, GPIO_Pin_2, Bit_SET);
-    } else {
-        GPIO_WriteBit(GPIOA, GPIO_Pin_2, Bit_RESET);
+// Writes 1 on all NSS pins
+void rf24l01_deselect_device(rf24l01_context ctx) {
+    if (ctx.device_id == 0) {
+        GPIO_WriteBit(GPIOA, GPIO_Pin_4, Bit_SET);
+    } else if (ctx.device_id == 1) {
+        GPIO_WriteBit(GPIOA, GPIO_Pin_0, Bit_SET);
     }
 }
 
-rf24l01_context rf24l01_init(SPI_TypeDef *spi, rf24l01_role role) {
+// Select device to SPI transmissions by sending 0 to its NSS
+void rf24l01_select_device(rf24l01_context ctx) {
+    rf24l01_deselect_device(ctx);
+
+    if (ctx.device_id == 0) {
+        GPIO_WriteBit(GPIOA, GPIO_Pin_4, Bit_RESET);
+    } else if (ctx.device_id == 1) {
+        GPIO_WriteBit(GPIOA, GPIO_Pin_0, Bit_RESET);
+    }
+}
+
+void rf24l01_ce(rf24l01_context ctx, bool new_state) {
+    if (ctx.device_id == 0) {
+        if (new_state) {
+            GPIO_WriteBit(GPIOA, GPIO_Pin_2, Bit_SET);
+        } else {
+            GPIO_WriteBit(GPIOA, GPIO_Pin_2, Bit_RESET);
+        }
+    } else if (ctx.device_id == 1) {
+        if (new_state) {
+            GPIO_WriteBit(GPIOA, GPIO_Pin_8, Bit_SET);
+        } else {
+            GPIO_WriteBit(GPIOA, GPIO_Pin_8, Bit_RESET);
+        }
+    }
+}
+
+void rf24l01_gpio_init(rf24l01_context ctx) {
+    GPIO_InitTypeDef GPIO_InitStructure;
+
+    // Configure RF24 pins
+    if (ctx.device_id == 0) {
+        // CE
+        GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2;
+        GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+        GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+        GPIO_Init(GPIOA, &GPIO_InitStructure);
+        GPIO_WriteBit(GPIOA, GPIO_Pin_2, Bit_SET);
+
+        // IRQ
+        GPIO_InitStructure.GPIO_Pin = GPIO_Pin_3;
+        GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+        GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+        // Soft NSS
+        GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4;
+        GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+        GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+    } else if (ctx.device_id == 1) {
+        // CE
+        GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8;
+        GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+        GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+        GPIO_Init(GPIOA, &GPIO_InitStructure);
+        GPIO_WriteBit(GPIOA, GPIO_Pin_8, Bit_SET);
+
+
+        // Soft NSS
+        GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
+        GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+        GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+        GPIO_Init(GPIOA, &GPIO_InitStructure);
+    }
+
+    rf24l01_deselect_device(ctx);
+
+}
+
+rf24l01_context rf24l01_init(u8 device_id, SPI_TypeDef *spi, TIM_TypeDef *timer, rf24l01_role role) {
     rf24l01_context ctx;
     ctx.spi = spi;
-    ctx.timer = TIM3;
+    ctx.timer = timer;
+    ctx.device_id = device_id;
 
     // Initialize SPI1
     spi_init(ctx.spi);
 
     // Prepare timer
     setup_delay_timer(ctx.timer);
+
+    // SetUp GPIO
+    rf24l01_gpio_init(ctx);
 
     u8 init_buffer[5] = {0x00};
 
@@ -92,32 +148,41 @@ u8 rf24l01_status(rf24l01_context ctx) {
     return rf24l01_send_command_single(ctx, NOP);
 }
 
+// Wrapper is used, because if we have more than one device on SPI bus, it's
+// required to control its NSS bit
+void rf24l01_spi_send_wrapper(rf24l01_context ctx, u8 *tx, u8 *rx, u8 bytes) {
+
+    rf24l01_select_device(ctx);
+    spi_send(ctx.spi, tx, rx, bytes);
+    rf24l01_deselect_device(ctx);
+}
+
 void rf24l01_write_register(rf24l01_context ctx, u8 addr, u8 *tx_buffer, u8 bytes) {
     tx[0] = W_REGISTER | addr;
     memcpy(tx+1, tx_buffer, bytes);
 
 
-    spi_send(ctx.spi, tx, rx, bytes + 1);
+    rf24l01_spi_send_wrapper(ctx, tx, rx, bytes + 1);
 }
 
 // Reads `bytes` bytes from `addr` to `rx_buffer`. Returns Status register
 u8 rf24l01_read_register(rf24l01_context ctx, u8 addr, u8 *rx_buffer, u8 bytes) {
     memset(tx, 0, bytes + 1);
     tx[0] = R_REGISTER | addr;
-    spi_send(ctx.spi, tx, rx_buffer, bytes + 1);
+    rf24l01_spi_send_wrapper(ctx, tx, rx_buffer, bytes + 1);
     return rx_buffer[0];
 }
 
 u8 rf24l01_send_command_single(rf24l01_context ctx, u8 command) {
     tx[0] = command;
-    spi_send(ctx.spi, tx, rx, 1);
+    rf24l01_spi_send_wrapper(ctx, tx, rx, 1);
     return rx[0];
 }
 
 u8 rf24l01_send_command_multiple(rf24l01_context ctx, u8 command, u8 *data, u8 bytes) {
     tx[0] = command;
     memcpy(tx+1, data, bytes);
-    spi_send(ctx.spi, tx, rx, bytes + 1);
+    rf24l01_spi_send_wrapper(ctx, tx, rx, bytes + 1);
     return rx[0];
 }
 
@@ -126,9 +191,9 @@ void rf24l01_send_payload(rf24l01_context ctx, u8 *data, u8 size) {
     rf24l01_send_command_multiple(ctx, W_TX_PAYLOAD, data, size);
 
     delay_us(ctx.timer, 1000);
-    rf24l01_ce(1);
+    rf24l01_ce(ctx, 1);
     delay_us(ctx.timer, 20);
-    rf24l01_ce(0);
+    rf24l01_ce(ctx, 0);
     delay_us(ctx.timer, 1000);
     rf24l01_reset(ctx);
 }
@@ -139,9 +204,6 @@ void rf24l01_reset(rf24l01_context ctx) {
 }
 
 u8 rf24l01_receive_payload(rf24l01_context ctx) {
-    rf24l01_ce(1);
-    delay_us(ctx.timer, 1000);
-    rf24l01_ce(0);
 
     rf24l01_read_register(ctx, R_RX_PAYLOAD, rx, 5);
     rf24l01_reset(ctx);
