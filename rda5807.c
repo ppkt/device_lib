@@ -99,9 +99,7 @@ void rda5807_set_volume(u8 new_volume) {
     I2C_Master_BufferWrite(I2C1, tx, 1, DMA, RDA5970_ADDRESS << 1);
     I2C_Master_BufferRead(I2C1, tx+1, 2, DMA, RDA5970_ADDRESS << 1);
 
-    printf("%X\r\n", tx[2]);
     tx[2] = (tx[2] & 0xF0) | new_volume;
-    printf("%X\r\n", tx[2]);
 
     I2C_Master_BufferWrite(I2C1, tx, 3, DMA, RDA5970_ADDRESS << 1);
 }
