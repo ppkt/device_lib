@@ -15,6 +15,7 @@ void hd44780_go_to_line(u8 line);
 void hd44780_go_to(u8 row, u8 col);
 void hd44780_cmd(u8 cmd);
 void hd44780_char(u8 c);
+void hd44780_backlight(bool new_value);
 
 
 #endif // __HD44780_I2C_H__
