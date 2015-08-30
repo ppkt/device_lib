@@ -131,5 +131,7 @@ void ir_nec_state_machine(unsigned int time) {
 }
 
 u8 ir_nec_get_last_command() {
-    return global_command;
+    u8 command = global_command;
+    global_command = 0;
+    return command;
 }
