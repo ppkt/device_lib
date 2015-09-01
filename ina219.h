@@ -15,5 +15,6 @@ uint16_t ina219_perform_calibration(void);
 float ina219_read_bus_voltage(void);
 int16_t ina219_read_shunt_voltage(void);
 uint16_t ina219_read_current(uint16_t calibration_register);
+void ina219_get_power(void);
 
 #endif // __INA291_H__

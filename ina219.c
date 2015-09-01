@@ -113,11 +113,23 @@ uint16_t ina219_read_current(uint16_t calibration_register) {
 
     int16_t shunt_voltage = ina219_read_shunt_voltage();
 
-    uint16_t current = (shunt_voltage * calibration_register) / 4096.0;
+    uint32_t current = (shunt_voltage * calibration_register) / 4096;
 
     float m_ampers = current * 0.025; // 1 LSB = 0.025 mA (calculated value)
 
     printf("Current: %d mA\r\n", (uint8_t)m_ampers);
 
-    return 0;
+    return current;
+}
+
+void ina219_get_power(void) {
+    // Read power register (current * drop voltage / 5000)
+
+    rx[0] = 0x03;
+    I2C_Master_BufferWrite(I2C1, rx, 1, Polling, 0x40 << 1);
+    I2C_Master_BufferRead(I2C1, rx, 2, Polling, 0x40 << 1);
+    uint16_t power = (rx[0] << 8 | rx[1]);
+
+    power /= 2; // 1 LSB = 0.5 mW (calculated value) = 20 * Current LSB
+    printf("Power: %u mW\r\n", power);
 }
