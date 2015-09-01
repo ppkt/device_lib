@@ -52,20 +52,12 @@ void ina219_setup(void) {
 }
 
 uint16_t ina219_perform_calibration(void) {
-    // Read and print previous value of calibration register
-
-    rx[0] = 0x05;
-    I2C_Master_BufferWrite(I2C1, rx, 1, Polling, 0x40 << 1);
-    I2C_Master_BufferRead(I2C1, rx, 2, Polling, 0x40 << 1);
-
-    uint16_t value = rx[0] << 8 | rx[1];
-    printf("Prev: %X\r\n", value);
-
-
-    // Write new values (calculated from INA219 datasheet)
+    // Write new values (calculated from INA219 datasheet) of calibration
+    // register
+    //
     // WARNING: All calculations (except measuring voltage on bus and shunt
     // resistor - 0.1 ohm in this case) are based on "PROGRAMMING THE INA219
-    // POWER MEASUREMENT ENGINE " chapter of INA219 datasheet
+    // POWER MEASUREMENT ENGINE" chapter of INA219 datasheet
     rx[0] = 0x05;
     rx[1] = 0x40;
     rx[2] = 0x00;
@@ -75,7 +67,7 @@ uint16_t ina219_perform_calibration(void) {
     return (rx[1] << 8) | rx[2];
 }
 
-float ina219_read_bus_voltage(void) {
+uint16_t ina219_read_bus_voltage(void) {
     // Read and print bus voltage
 
     rx[0] = 0x02;
@@ -85,12 +77,17 @@ float ina219_read_bus_voltage(void) {
     // TODO: Check and handle overflows
     uint16_t value = (rx[0] << 8 | rx[1]) >> 3;
     value *= 4; // 1 LSB = 4mV (value from datasheet)
-    uint8_t v = value / 1000;
-    printf("Bus voltage: %d.%03d V\r\n", v, value - (v * 1000));
 
-    return value / 1000.0;
+    return value;
 }
 
+void ina219_print_bus_voltage(void) {
+    int16_t voltage = ina219_read_bus_voltage();
+
+    uint8_t v = voltage / 1000;
+    printf("Bus voltage: %d.%03d V\r\n", v, abs(voltage - (v * 1000)));
+
+}
 
 int16_t ina219_read_shunt_voltage(void) {
     // Read drop of voltage across shunt
@@ -100,29 +97,45 @@ int16_t ina219_read_shunt_voltage(void) {
     I2C_Master_BufferRead(I2C1, rx, 2, Polling, 0x40 << 1);
 
     int16_t value = (rx[0] << 8 | rx[1]);
-    int8_t v = value / 1000; // 1 LSB = 10uV (value from datasheet)
-
-    printf("Shunt voltage: %d.%03d mV\r\n", v, abs(value - (v * 1000)));
 
     return value;
 }
 
-uint16_t ina219_read_current(uint16_t calibration_register) {
+void ina219_print_shunt_voltage(void) {
+    int16_t voltage = ina219_read_shunt_voltage();
+
+    int8_t v = voltage / 1000; // 1 LSB = 10uV (value from datasheet)
+
+    printf("Shunt voltage: %d.%03d mV\r\n", v, abs(voltage - (v * 1000)));
+}
+
+uint16_t ina219_read_current(void) {
     // Based on shunt voltage drop and value of calibration register
     // calculates current
+
+    // Read calibration register
+    rx[0] = 0x05;
+    I2C_Master_BufferWrite(I2C1, rx, 1, Polling, 0x40 << 1);
+    I2C_Master_BufferRead(I2C1, rx, 2, Polling, 0x40 << 1);
+
+    uint16_t calibration_register = (rx[0] << 8 | rx[1]);
 
     int16_t shunt_voltage = ina219_read_shunt_voltage();
 
     uint32_t current = (shunt_voltage * calibration_register) / 4096;
 
-    float m_ampers = current * 0.025; // 1 LSB = 0.025 mA (calculated value)
-
-    printf("Current: %d mA\r\n", (uint8_t)m_ampers);
-
     return current;
 }
 
-void ina219_get_power(void) {
+void ina219_print_current(void) {
+    uint16_t current = ina219_read_current();
+
+    float m_ampers = current * 0.025; // 1 LSB = 0.025 mA (calculated value)
+
+    printf("Current: %d mA\r\n", (uint8_t)m_ampers);
+}
+
+uint16_t ina219_get_power(void) {
     // Read power register (current * drop voltage / 5000)
 
     rx[0] = 0x03;
@@ -130,6 +143,13 @@ void ina219_get_power(void) {
     I2C_Master_BufferRead(I2C1, rx, 2, Polling, 0x40 << 1);
     uint16_t power = (rx[0] << 8 | rx[1]);
 
+    return power;
+}
+
+void ina219_print_power(void) {
+    uint16_t power = ina219_get_power();
+
     power /= 2; // 1 LSB = 0.5 mW (calculated value) = 20 * Current LSB
+
     printf("Power: %u mW\r\n", power);
 }

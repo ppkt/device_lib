@@ -12,9 +12,14 @@
 
 void ina219_setup(void);
 uint16_t ina219_perform_calibration(void);
-float ina219_read_bus_voltage(void);
+uint16_t ina219_read_bus_voltage(void);
 int16_t ina219_read_shunt_voltage(void);
-uint16_t ina219_read_current(uint16_t calibration_register);
-void ina219_get_power(void);
+uint16_t ina219_read_current(void);
+uint16_t ina219_get_power(void);
+
+void ina219_print_bus_voltage(void);
+void ina219_print_shunt_voltage(void);
+void ina219_print_current(void);
+void ina219_print_power(void);
 
 #endif // __INA291_H__
