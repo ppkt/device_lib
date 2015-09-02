@@ -76,13 +76,14 @@ uint16_t ina219_read_bus_voltage(void) {
 
     // TODO: Check and handle overflows
     uint16_t value = (rx[0] << 8 | rx[1]) >> 3;
-    value *= 4; // 1 LSB = 4mV (value from datasheet)
 
     return value;
 }
 
 void ina219_print_bus_voltage(void) {
     int16_t voltage = ina219_read_bus_voltage();
+
+    voltage *= 4; // 1 LSB = 4mV (value from datasheet)
 
     uint8_t v = voltage / 1000;
     printf("Bus voltage: %d.%03d V\r\n", v, abs(voltage - (v * 1000)));
