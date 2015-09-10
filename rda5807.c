@@ -10,7 +10,7 @@ static u8 tx[] = {0x02,
 
 static u8 rx[64];
 
-void rda5807_init() {
+void rda5807_init(TIM_TypeDef *timer) {
     tx[0] = 0x00;
     I2C_Master_BufferWrite(I2C1, tx, 1, DMA, RDA5970_ADDRESS << 1);
     I2C_Master_BufferRead(I2C1, rx, 2, DMA, RDA5970_ADDRESS << 1);
@@ -24,15 +24,14 @@ void rda5807_init() {
     tx[1] = 0x00;
     tx[2] = 0x03;
     I2C_Master_BufferWrite(I2C1, tx, 3, DMA, RDA5970_ADDRESS << 1);
-    delay(500);
+    delay_ms(timer, 500);
 
     // Enable
     tx[1] = 0xC0;
     tx[2] = 0x0D;
     I2C_Master_BufferWrite(I2C1, tx, 3, DMA, RDA5970_ADDRESS << 1);
-    delay(500);
+    delay_ms(timer, 500);
 
-    delay(100);
     printf("Configuration done\r\n");
 }
 
@@ -46,7 +45,6 @@ void rda5807_set_frequency(u16 new_frequency) {
     tx[1] = freqH;
     tx[2] = freqL + 0x10;
     I2C_Master_BufferWrite(I2C1, tx, 3, DMA, RDA5970_ADDRESS << 1);
-//    delay(500);
 }
 
 bool rda5807_toggle_mute() {
@@ -92,8 +90,6 @@ bool rda5807_toggle_bass_boost() {
 }
 
 void rda5807_set_volume(u8 new_volume) {
-    printf("%d\r\n", new_volume);
-
     // Read current data
     tx[0] = 0x05;
     I2C_Master_BufferWrite(I2C1, tx, 1, DMA, RDA5970_ADDRESS << 1);

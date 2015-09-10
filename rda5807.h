@@ -10,7 +10,7 @@
 #define RDA5970_ADDRESS 0x11
 #define RDA5970_ID 0x58
 
-void rda5807_init();
+void rda5807_init(TIM_TypeDef *timer);
 void rda5807_set_frequency(u16 new_frequency);
 //void rda5807_print_rds(void);
 void rda5807_set_mute(bool value);
