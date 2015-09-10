@@ -100,28 +100,10 @@ void hd44780_cgram_write(u8 pos, u8 data_[8]) {
 void hd44780_init(TIM_TypeDef *t) {
 	timer = t;
 	// Setup clock
-	if (timer == TIM2)
-            RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
-	else if (timer == TIM3)
-	    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
-	else
-            while(1){} // not implemented
-	TIM_TimeBaseInitTypeDef TIM_InitStructure;
-	TIM_InitStructure.TIM_CounterMode = TIM_CounterMode_Up;
-	TIM_InitStructure.TIM_Prescaler = (SystemCoreClock) / 1000000 - 1;
-	TIM_InitStructure.TIM_Period = 10000 - 1; // Update event every 10000 us / 10 ms
-	TIM_InitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
-	TIM_InitStructure.TIM_RepetitionCounter = 0;
-	TIM_TimeBaseInit(timer, &TIM_InitStructure);
-	TIM_Cmd(timer, ENABLE);
-
+        setup_delay_timer(timer);
 
 	hd44780_data[0] = 0x00 | backlight;
 	hd44780_data[1] = 0x00 | backlight;
-
-//	GPIO_SetBits(GPIOC, GPIO_Pin_8);
-//	delay_us(timer, 250);
-//	GPIO_ResetBits(GPIOC, GPIO_Pin_8);
 
         // Init I2C
         I2C_LowLevel_Init(I2C1);
