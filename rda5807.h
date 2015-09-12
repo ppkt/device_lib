@@ -15,6 +15,7 @@ void rda5807_set_frequency(u16 new_frequency);
 //void rda5807_print_rds(void);
 void rda5807_set_mute(bool value);
 bool rda5807_toggle_mute();
+void rda5807_set_bass_boost(bool value);
 bool rda5807_toggle_bass_boost();
 void rda5807_set_volume(u8 new_volume);
 
