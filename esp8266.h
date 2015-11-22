@@ -16,7 +16,8 @@
 typedef enum {
     AT_CWLAP = 0, // Get AP list
     AT_CIFSR, // Get IP address
-    AT_CWJAP,  // Connected AP info
+    AT_CWJAP_DEF,  // Connect to AP or get info about connected AP
+    AT_CWJAP_CUR,
     AT_CWQAP, // Disconnect from AP
     AT_CIPSERVER, // TCP Server
     AT, // Check module presence
@@ -40,8 +41,8 @@ typedef enum {
 } Type;
 
 typedef enum {
-    PARAMETER_CUR, // Value from RAM
-    PARAMETER_DEF, // Value from Flash
+    PARAMETER_CUR = 0, // Value from RAM (temporary)
+    PARAMETER_DEF, // Value from Flash (persistent)
 } ParameterType;
 
 typedef enum {
@@ -59,5 +60,7 @@ void esp8266_echo_off(void);
 void esp8266_echo_on(void);
 void esp8266_set_mode(Esp8266_mode new_mode, bool persistent);
 Esp8266_mode esp8266_get_mode(bool persistent);
+uint8_t esp8266_join_ap(char* ssid, char* pwd, char* bssid, bool persistent);
+uint8_t esp8266_get_ap_info(bool persistent);
 
 #endif // __ESP8266_H__
