@@ -35,7 +35,7 @@ typedef enum {
 
 typedef enum {
     TYPE_SET_EXECUTE = 0,
-    TYPE_INQUIRY,
+    TYPE_QUERY,
     TYPE_TEST
 } Type;
 
@@ -58,5 +58,6 @@ void esp8266_get_version(void);
 void esp8266_echo_off(void);
 void esp8266_echo_on(void);
 void esp8266_set_mode(Esp8266_mode new_mode, bool persistent);
+Esp8266_mode esp8266_get_mode(bool persistent);
 
 #endif // __ESP8266_H__

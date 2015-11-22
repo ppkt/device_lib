@@ -15,6 +15,8 @@ bool busy = 0;
 static Operation _operation;
 static Type _type;
 
+static Esp8266_mode _mode = ESP8266_MODE_SOFTAP;
+
 void esp8266_enable_interrupts() {
     NVIC_InitTypeDef NVIC_InitStructure;
     EXTI_InitTypeDef EXTI_InitStructure;
@@ -74,6 +76,8 @@ void esp8266_send_command(Type type, Operation operation) {
             if (type == TYPE_SET_EXECUTE) {
                 usart1_print("+CWMODE_CUR=");
                 usart1_print(custom_command);
+            } else if (type == TYPE_QUERY) {
+                usart1_print("+CWMODE_CUR?");
             }
             break;
 
@@ -83,6 +87,8 @@ void esp8266_send_command(Type type, Operation operation) {
             if (type == TYPE_SET_EXECUTE) {
                 usart1_print("+CWMODE_DEF=");
                 usart1_print(custom_command);
+            } else if (type == TYPE_QUERY) {
+                usart1_print("+CWMODE_DEF?");
             }
             break;
 
@@ -109,17 +115,59 @@ bool esp8266_parse_ready(char* string) {
     return false;
 }
 
+bool esp8266_parse_cwmode(char* string) {
+    // First, we are waiting on mode from ESP i.e.: +CWMODE_CUR:2
+    // then, just for OK
+
+    static uint8_t state = 0;
+
+    if (state == 0) {
+        // Waiting for reply with current state
+        static char reply[] = "+CWMODE_";
+        char* ptr = strstr(string, reply);
+
+        if (!ptr)
+            return false;
+
+        ptr += strlen(reply) + 4; // skip +CWMODE_ + CUR/DEF + ":" in reply, see above
+
+        _mode = *ptr - '0';
+
+        state = 1;
+
+    } else if (state == 1) {
+        // Waiting for OK
+        if (esp8266_parse_ok(string)) {
+            state = 0;
+            return true;
+        }
+    }
+
+    return true;
+}
+
 void esp8266_parse_string(char *incoming) {
     switch (_operation) {
         case AT:
         case AT_GMR:
         case ATE0:
         case ATE1:
-        case AT_CWMODE_CUR:
-        case AT_CWMODE_DEF:
             if (!esp8266_parse_ok(incoming))  // Not the response we are looking for
                 return;
             break;
+
+
+        case AT_CWMODE_CUR:
+        case AT_CWMODE_DEF:
+            if (_type == TYPE_QUERY) {
+                if (!esp8266_parse_cwmode(incoming))
+                    return; // Still waiting
+            } else {
+                if (!esp8266_parse_ok(incoming))
+                    return; // Still waiting
+            }
+            break;
+
 
         case AT_RST:
             if (!esp8266_parse_ready(incoming))
@@ -151,27 +199,27 @@ void esp8266_wait_for_response() {
 }
 
 void esp8266_at(void) {
-    esp8266_send_command(TYPE_INQUIRY, AT);
+    esp8266_send_command(TYPE_SET_EXECUTE, AT);
     esp8266_wait_for_response();
 }
 
 void esp8266_reset(void) {
-    esp8266_send_command(TYPE_INQUIRY, AT_RST);
+    esp8266_send_command(TYPE_SET_EXECUTE, AT_RST);
     esp8266_wait_for_response();
 }
 
 void esp8266_get_version(void) {
-    esp8266_send_command(TYPE_INQUIRY, AT_GMR);
+    esp8266_send_command(TYPE_SET_EXECUTE, AT_GMR);
     esp8266_wait_for_response();
 }
 
 void esp8266_echo_off(void) {
-    esp8266_send_command(TYPE_INQUIRY, ATE0);
+    esp8266_send_command(TYPE_SET_EXECUTE, ATE0);
     esp8266_wait_for_response();
 }
 
 void esp8266_echo_on(void) {
-    esp8266_send_command(TYPE_INQUIRY, ATE1);
+    esp8266_send_command(TYPE_SET_EXECUTE, ATE1);
     esp8266_wait_for_response();
 }
 
@@ -185,6 +233,17 @@ void esp8266_set_mode(Esp8266_mode new_mode, bool persistent) {
         esp8266_send_command(TYPE_SET_EXECUTE, AT_CWMODE_CUR);
 
     esp8266_wait_for_response();
+}
+
+Esp8266_mode esp8266_get_mode(bool persistent) {
+    if (persistent)
+        esp8266_send_command(TYPE_QUERY, AT_CWMODE_DEF);
+    else
+        esp8266_send_command(TYPE_QUERY, AT_CWMODE_CUR);
+
+    esp8266_wait_for_response();
+
+    return _mode;
 }
 
 void esp8266_new_line(char* line) {
