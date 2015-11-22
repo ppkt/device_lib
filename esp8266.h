@@ -14,24 +14,17 @@
 #include "main.h"
 
 typedef enum {
-    AT_CWLAP = 0, // Get AP list
-    AT_CIFSR, // Get IP address
     AT_CWJAP_DEF,  // Connect to AP or get info about connected AP
     AT_CWJAP_CUR,
-    AT_CWQAP, // Disconnect from AP
-    AT_CIPSERVER, // TCP Server
     AT, // Check module presence
     AT_RST, // Restarts device
     ATE0, // Disable echo
     ATE1, // Enable echo
     AT_CWMODE_DEF, // Wifi mode (1 = Station, 2 = AP, 3 = both)
     AT_CWMODE_CUR,
-    AT_CIPMUX, // 0 for single connection mode, 1 for multiple connection
-    AT_CIPSTART, // establish connetion with remote host
-    AT_CIPSEND, // begin sending data
-    AT_SEND_DATA, // send data
-    AT_CLOSE, // close connection
     AT_GMR, // get version info
+    AT_CIPSTA_DEF, // set/get IP address in Station Mode
+    AT_CIPSTA_CUR,
 } Operation;
 
 typedef enum {
@@ -62,5 +55,8 @@ void esp8266_set_mode(Esp8266_mode new_mode, bool persistent);
 Esp8266_mode esp8266_get_mode(bool persistent);
 uint8_t esp8266_join_ap(char* ssid, char* pwd, char* bssid, bool persistent);
 uint8_t esp8266_get_ap_info(bool persistent);
+void esp8266_set_static_ip(char* ip_address, char* gateway, char* netmask,
+                           bool persistent);
+char* esp8266_get_ip_address(bool persistent);
 
 #endif // __ESP8266_H__

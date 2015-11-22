@@ -86,6 +86,25 @@ void esp8266_send_command(Type type, Operation operation) {
 
             break;
 
+        case AT_CIPSTA_CUR:
+        case AT_CIPSTA_DEF:
+            usart1_print(AT_command);
+            usart1_print("+CIPSTA_");
+
+            if (operation == AT_CIPSTA_CUR)
+                usart1_print("CUR");
+            else
+                usart1_print("DEF");
+
+            if (type == TYPE_SET_EXECUTE) {
+                usart1_print("=");
+                usart1_print(custom_command);
+            } else if (type == TYPE_QUERY) {
+                usart1_print("?");
+            }
+            break;
+
+
         default:
             return;
 
@@ -104,7 +123,7 @@ bool esp8266_parse_ok(char* string) {
 }
 
 bool esp8266_parse_ready(char* string) {
-    if (strcmp(string, "ready") == 0)
+    if (strcmp(string, "WIFI GOT IP") == 0)
         return true;
     return false;
 }
@@ -218,6 +237,30 @@ bool esp8266_parse_cwjap_query(char* string) {
     return false;
 }
 
+bool esp8266_parse_cipsta(char* string) {
+
+    static uint8_t state = 0;
+    static char match[] = "+CIPSTA_";
+
+    if (state == 0) {
+        if (strncmp(string, match, strlen(match)) == 0) {
+            // Reply in format: +CIPSTA_CUR:ip:"<IP>"
+            char* ip_address = &string[0] + strlen(match) + 7 + 1;
+
+            state = 1;
+            strncpy(custom_command, ip_address, strlen(ip_address) - 1);
+
+            return false;
+        }
+    } else if (state == 1) {
+        if (esp8266_parse_ok(string)) {
+            state = 0;
+            return true;
+        }
+    }
+    return false;
+}
+
 void esp8266_parse_string(char *incoming) {
     switch (_operation) {
         case AT:
@@ -251,6 +294,17 @@ void esp8266_parse_string(char *incoming) {
                     return;
             } else if (_type == TYPE_QUERY) {
                 if (!esp8266_parse_cwjap_query(incoming))
+                    return;
+            }
+            break;
+
+        case AT_CIPSTA_CUR:
+        case AT_CIPSTA_DEF:
+            if (_type == TYPE_SET_EXECUTE) {
+                if (!esp8266_parse_ok(incoming))
+                    return;
+            } else if (_type == TYPE_QUERY) {
+                if (!esp8266_parse_cipsta(incoming))
                     return;
             }
             break;
@@ -326,6 +380,8 @@ Esp8266_mode esp8266_get_mode(bool persistent) {
 }
 
 uint8_t esp8266_join_ap(char* ssid, char* pwd, char* bssid, bool persistent) {
+    // Note - bssid is NOT required, please provide empty string in this case
+
     // TODO: special characters (, " /) in SSID and PWD should be escaped by "/"
     // character: ab/,c > ab///,c
     //            12345"/" > 12345/"///"
@@ -360,6 +416,37 @@ uint8_t esp8266_get_ap_info(bool persistent) {
     uint8_t error = _last_error;
     _last_error = 0;
     return error;
+}
+
+void esp8266_set_static_ip(char* ip_address, char* gateway, char* netmask,
+                           bool persistent) {
+    // Note: gateway and netmask are NOT mandatory, but you have to provide
+    // both addresses. Provide empty string if there addresses are not used
+
+    // Note: setting IP address disables internal DHCP client and vice versa
+
+    if (strlen(gateway) > 0 && strlen(netmask) > 0)
+        sprintf(custom_command, "\"%s\",\"%s\",\"%s\"",
+                ip_address, gateway, netmask);
+    else
+        sprintf(custom_command, "\"%s\"", ip_address);
+
+    if (persistent)
+        esp8266_send_command(TYPE_SET_EXECUTE, AT_CIPSTA_DEF);
+    else
+        esp8266_send_command(TYPE_SET_EXECUTE, AT_CIPSTA_CUR);
+
+    esp8266_wait_for_response();
+}
+
+char* esp8266_get_ip_address(bool persistent) {
+    if (persistent)
+        esp8266_send_command(TYPE_QUERY, AT_CIPSTA_DEF);
+    else
+        esp8266_send_command(TYPE_QUERY, AT_CIPSTA_CUR);
+    esp8266_wait_for_response();
+
+    return strdup(custom_command);
 }
 
 void esp8266_new_line(char* line) {
