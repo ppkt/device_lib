@@ -153,7 +153,7 @@ void bmp180_calculate_true_temperature(CalibrationData* data) {
     data->B5 = data->X1 + data->X2;
     data->T = (data->B5 + 8) >> 4;
 
-    printf("T = %u\n\r", (unsigned int)data->T);
+//    printf("T = %u\n\r", (unsigned int)data->T);
 }
 
 // 5. Using calibration data and real temperature, get real pressure
@@ -183,7 +183,7 @@ void bmp180_calculate_true_pressure(CalibrationData *data) {
     data->X2 = (data->p * -7357) >> 16;
     data->p = data->p + ((data->X1 + data->X2 + 3791) >> 4);
 
-    printf("p = %u\n\r", (unsigned int)data->p);
+//    printf("p = %u\n\r", (unsigned int)data->p);
 }
 
 // 6. Convert real pressure to absolute altitude
@@ -191,7 +191,7 @@ void bmp180_get_absolute_altitude(CalibrationData *data) {
     // x^y -> exp(y * log(x))
     float b = expf(1.0/5.255 * logf(data->p / 101325.0));
     float f = 44330 * (1 - b);
-    printf("altitude = %d\n\r", (int)f);
+//    printf("altitude = %d\n\r", (int)f);
 
     //	version above doesn't require more memory
     //	float F = 44330 * (1 - powf(data->p / 101325.0, 1.0/5.255));
