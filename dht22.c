@@ -1,4 +1,4 @@
-#include "dht11.h"
+#include "dht22.h"
 
 GPIO_TypeDef *gpio;
 u16 pin;
@@ -7,23 +7,23 @@ u8 source_port;
 u8 source_pin;
 u32 interrupt_line;
 
-dht11_state dht11_current_state = DHT11_NONE;
-u16 dht11_pulse_lengths[6];
+dht22_state dht22_current_state = DHT22_NONE;
+u16 dht22_pulse_lengths[DHT22_STATE_SIZE];
 
-bool dht11_data[40];
+bool dht22_data[41];
 u8 data_pos = 0;
 
 u8 last_temperature = 0;
 u8 last_relative_humidity = 0;
 
-static void dht11_delay_us(unsigned int time) {
-	timer->CNT = 0;
-	time -= 3;
-	while (timer->CNT <= time) {}
+static void dht22_delay_us(unsigned int time) {
+    timer->CNT = 0;
+    time -= 3;
+    while (timer->CNT <= time) {}
 }
 
 // Configures GPIO pin, timer and interrupts
-void dht11_init(GPIO_TypeDef *gpio_, u16 pin_, u8 source_pin_, TIM_TypeDef *timer_) {
+void dht22_init(GPIO_TypeDef *gpio_, u16 pin_, u8 source_pin_, TIM_TypeDef *timer_) {
     gpio = gpio_;
     pin = pin_;
     timer = timer_;
@@ -31,13 +31,13 @@ void dht11_init(GPIO_TypeDef *gpio_, u16 pin_, u8 source_pin_, TIM_TypeDef *time
     interrupt_line = pin_;
 
     // Time in us
-    dht11_pulse_lengths[DHT11_NONE] = 0;
-    dht11_pulse_lengths[DHT11_INIT_PULL_DOWN] = 80;
-    dht11_pulse_lengths[DHT11_INIT_RELEASE] = 80;
-    dht11_pulse_lengths[DHT11_PULL_DOWN] = 50;
-    dht11_pulse_lengths[DHT11_RELEASE_0] = 25;
-    dht11_pulse_lengths[DHT11_RELEASE_1] = 70;
-    dht11_pulse_lengths[DHT11_EOT] = 50;
+    dht22_pulse_lengths[DHT22_NONE] = 0;
+    dht22_pulse_lengths[DHT22_INIT_PULL_DOWN] = 80;
+    dht22_pulse_lengths[DHT22_INIT_RELEASE] = 80;
+    dht22_pulse_lengths[DHT22_PULL_DOWN] = 50;
+    dht22_pulse_lengths[DHT22_RELEASE_0] = 25;
+    dht22_pulse_lengths[DHT22_RELEASE_1] = 70;
+    dht22_pulse_lengths[DHT22_EOT] = 50;
 
     // Enable GPIO clock
     if (gpio == GPIOA) {
@@ -102,30 +102,27 @@ void dht11_init(GPIO_TypeDef *gpio_, u16 pin_, u8 source_pin_, TIM_TypeDef *time
 }
 
 // Sends reset pulse
-bool dht11_reset_pulse() {
-    // Pull bus down for at least 18 ms
+bool dht22_reset_pulse() {
+    // Pull bus down for at least 800 us
     GPIO_ResetBits(gpio, pin);
-    dht11_delay_us(5000);
-    dht11_delay_us(5000);
-    dht11_delay_us(5000);
-    dht11_delay_us(5000);
+    dht22_delay_us(1000);
     GPIO_SetBits(gpio, pin);
 
     // Wait for recovery (20-40 us)
-    dht11_current_state = DHT11_NONE;
+    dht22_current_state = DHT22_NONE;
     TIM_SetCounter(timer, 0);
-    dht11_delay_us(40);
+    dht22_delay_us(40);
 
     return false;
 }
 
 
 // Checks if received signal has expected length
-bool dht11_check_tolerance(u32 timer) {
+bool dht22_check_tolerance(u32 timer) {
 
-    u16 expected = dht11_pulse_lengths[dht11_current_state];
+    u16 expected = dht22_pulse_lengths[dht22_current_state];
 
-    if (dht11_current_state == DHT11_NONE) {
+    if (dht22_current_state == DHT22_NONE) {
         return true;
     }
 
@@ -142,55 +139,55 @@ bool dht11_check_tolerance(u32 timer) {
     return false;
 }
 
-void dht11_trigger_state_machine(u32 timer, u8 bit) {
-    u8 middle_value = (dht11_pulse_lengths[DHT11_RELEASE_0] + dht11_pulse_lengths[DHT11_RELEASE_1]) / 2;
-    dht11_check_tolerance(timer);
+void dht22_trigger_state_machine(u32 timer, u8 bit) {
+    u8 middle_value = (dht22_pulse_lengths[DHT22_RELEASE_0] + dht22_pulse_lengths[DHT22_RELEASE_1]) / 2;
+    dht22_check_tolerance(timer);
 
 //    char tab[10];
 //    sprintf(tab, "%u\r\n", (unsigned int)timer);
 
-    switch(dht11_current_state) {
-        case DHT11_NONE:
+    switch(dht22_current_state) {
+        case DHT22_NONE:
             if (bit) {
                 break; // wrong state
             }
 //            GPIO_WriteBit(GPIOC, GPIO_Pin_13, Bit_SET);
-            dht11_current_state = DHT11_INIT_PULL_DOWN;
+            dht22_current_state = DHT22_INIT_PULL_DOWN;
 //            GPIO_WriteBit(GPIOC, GPIO_Pin_13, Bit_RESET);
             break;
-        case DHT11_INIT_PULL_DOWN:
-            dht11_current_state = DHT11_INIT_RELEASE;
+        case DHT22_INIT_PULL_DOWN:
+            dht22_current_state = DHT22_INIT_RELEASE;
             break;
-        case DHT11_INIT_RELEASE:
-            dht11_current_state = DHT11_PULL_DOWN;
+        case DHT22_INIT_RELEASE:
+            dht22_current_state = DHT22_PULL_DOWN;
             break;
-        case DHT11_PULL_DOWN:
-            dht11_current_state = DHT11_RELEASE_1;
+        case DHT22_PULL_DOWN:
+            dht22_current_state = DHT22_RELEASE_1;
             break;
 
 
-        case DHT11_RELEASE_0:
-        case DHT11_RELEASE_1:
+        case DHT22_RELEASE_0:
+        case DHT22_RELEASE_1:
             if (timer < middle_value) {
-                dht11_data[data_pos] = 0;
+                dht22_data[data_pos] = 0;
             } else {
-                dht11_data[data_pos] = 1;
+                dht22_data[data_pos] = 1;
             }
             ++data_pos;
 
-            dht11_current_state = DHT11_PULL_DOWN;
+            dht22_current_state = DHT22_PULL_DOWN;
 
             if (data_pos == 40) {
                 data_pos = 0;
-                dht11_current_state = DHT11_EOT;
-                dht11_decode_data();
+                dht22_current_state = DHT22_EOT;
+                dht22_decode_data();
             }
 
             break;
 
-        case DHT11_EOT:
+        case DHT22_EOT:
 //            GPIO_WriteBit(GPIOC, GPIO_Pin_13, Bit_SET);
-            dht11_current_state = DHT11_NONE;
+            dht22_current_state = DHT22_NONE;
 //            GPIO_WriteBit(GPIOC, GPIO_Pin_13, Bit_RESET);
             break;
         default:
@@ -198,9 +195,9 @@ void dht11_trigger_state_machine(u32 timer, u8 bit) {
     }
 }
 
-void dht11_decode_data() {
+void dht22_decode_data() {
     u8 i;
-//    char tab[43];
+    char tab[43];
 //    for (i = 0; i < 40; ++i) {
 //        tab[i] = 48 + data[i];
 //    }
@@ -209,31 +206,35 @@ void dht11_decode_data() {
 //    tab[42] = 0;
 //    printf(tab);
 
-    u8 temp_integral = 0, temp_decimal = 0, rh_integral = 0, rh_decimal = 0, checksum = 0;
+    u8 temp_high = 0, temp_low = 0, rh_high = 0, rh_low = 0;
+    u8 checksum = 0;
     for (i = 0; i < 8; ++i) {
-        rh_integral     |= dht11_data[i]      << (7 - i);
-        rh_decimal      |= dht11_data[8  + i] << (7 - i);
-        temp_integral   |= dht11_data[16 + i] << (7 - i);
-        temp_decimal    |= dht11_data[24 + i] << (7 - i);
-        checksum        |= dht11_data[32 + i] << (7 - i);
+        rh_high     |= dht22_data[i]      << (7 - i);
+        rh_low      |= dht22_data[8  + i] << (7 - i);
+        temp_high   |= dht22_data[16 + i] << (7 - i);
+        temp_low    |= dht22_data[24 + i] << (7 - i);
+        checksum    |= dht22_data[32 + i] << (7 - i);
     }
-//    sprintf(tab, "%d.%d %d.%d %d\r\n", temp_integral, temp_decimal, rh_integral, rh_decimal, checksum);
-    if (temp_integral + temp_decimal + rh_integral + rh_decimal == checksum) {
-        last_temperature = temp_integral;
-        last_relative_humidity = rh_integral;
+    u16 rh = rh_high << 8 | rh_low;
+    u16 temperature = temp_high << 8 | temp_low;
+    u8 sum = rh_high + rh_low + temp_high + temp_low;
+    sprintf(tab, "%d %d %u %u\r\n", temperature, rh, sum, checksum);
+    if (sum == checksum) {
+        last_temperature = temperature / 10;
+        last_relative_humidity = rh / 10;
     } else {
-//        printf("Checksum incorrect\r\n");
+        printf("Checksum incorrect\r\n");
         last_temperature = 0;
         last_relative_humidity = 0;
     }
-//    printf(tab);
+    printf(tab);
 }
 
-u8 dht11_get_temperature() {
+u8 dht22_get_temperature() {
     return last_temperature;
 }
 
-u8 dht11_get_rh() {
+u8 dht22_get_rh() {
     return last_relative_humidity;
 }
 
@@ -241,7 +242,7 @@ void EXTI9_5_IRQHandler(void) {
     static unsigned int counter;
 
     if (EXTI_GetITStatus(interrupt_line) != RESET) {
-        if (dht11_current_state != DHT11_EOT) {
+        if (dht22_current_state != DHT22_EOT) {
             u8 bit = GPIO_ReadInputDataBit(gpio, pin);
 //            if (bit) {
 //                    GPIO_ResetBits(GPIOC, GPIO_Pin_13);
@@ -252,7 +253,7 @@ void EXTI9_5_IRQHandler(void) {
             // Restart Timer
             counter = TIM_GetCounter(timer);
             TIM_SetCounter(timer, 0);
-            dht11_trigger_state_machine(counter, bit);
+            dht22_trigger_state_machine(counter, bit);
         }
 
         EXTI_ClearITPendingBit(interrupt_line);

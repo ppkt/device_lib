@@ -1,5 +1,5 @@
-#ifndef __DHT11_H__
-#define __DHT11_H__
+#ifndef __DHT22_H__
+#define __DHT22_H__
 #include "stdbool.h"
 //#include "stdio.h"
 
@@ -9,21 +9,23 @@
 #include "stm32f10x_exti.h"
 #include "stm32f10x_misc.h"
 
+// Keep value in sync!
+#define DHT22_STATE_SIZE 7
 typedef enum {
-    DHT11_NONE = 0,
-    DHT11_INIT_PULL_DOWN  =1,
-    DHT11_INIT_RELEASE = 2,
-    DHT11_PULL_DOWN = 3,
-    DHT11_RELEASE_1 = 4,
-    DHT11_RELEASE_0 = 5,
-    DHT11_EOT,
-} dht11_state;
+    DHT22_NONE = 0,
+    DHT22_INIT_PULL_DOWN  =1,
+    DHT22_INIT_RELEASE = 2,
+    DHT22_PULL_DOWN = 3,
+    DHT22_RELEASE_1 = 4,
+    DHT22_RELEASE_0 = 5,
+    DHT22_EOT = 6,
+} dht22_state;
 
-void dht11_init(GPIO_TypeDef *gpio_, u16 pin_, u8 source_pin_, TIM_TypeDef *timer_);
-void dht11_trigger_state_machine(u32 timer, u8 bit);
-bool dht11_reset_pulse();
-//bool dht11_check_tolerance(u32 timer);
-void dht11_decode_data();
-u8 dht11_get_temperature();
-u8 dht11_get_rh();
-#endif //__DHT11_H__
+void dht22_init(GPIO_TypeDef *gpio_, u16 pin_, u8 source_pin_, TIM_TypeDef *timer_);
+//void dht22_trigger_state_machine(u32 timer, u8 bit);
+bool dht22_reset_pulse();
+//bool dht22_check_tolerance(u32 timer);
+void dht22_decode_data();
+u8 dht22_get_temperature();
+u8 dht22_get_rh();
+#endif //__DHT22_H__
