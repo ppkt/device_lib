@@ -49,7 +49,7 @@ typedef enum {
 	BMP180_MODE_ULTRA_HIGH_RESOLUTION = 3,
 } BMP180_Mode;
 
-void bmp180_init(TIM_TypeDef *timer);
+void bmp180_init(I2C_TypeDef *i2c_bus, TIM_TypeDef *timer);
 bool bmp180_check_presence(void);
 void bmp180_get_calibration_data(CalibrationData* data);
 void bmp180_get_uncompensated_temperature(CalibrationData* data);

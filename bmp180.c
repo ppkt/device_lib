@@ -1,12 +1,14 @@
 #include "bmp180.h"
 
-/* Buffer of data to be received by I2C1 */
+/* Buffer of data to be received by I2C */
 static uint8_t rx[22];
-/* Buffer of data to be transmitted by I2C1 */
+/* Buffer of data to be transmitted by I2C */
 static uint8_t tx[2] = {0xAA};
 
 // delay timer
 static TIM_TypeDef *timer;
+// i2c peripheral in use
+I2C_TypeDef *i2c_bus;
 
 // Get delay (in ms), depending on sampling mode
 u8 bmp180_get_delay(BMP180_Mode mode) {
@@ -24,8 +26,9 @@ u8 bmp180_get_delay(BMP180_Mode mode) {
     }
 }
 
-void bmp180_init(TIM_TypeDef *t) {
-    I2C_LowLevel_Init(I2C1);
+void bmp180_init(I2C_TypeDef *i2c, TIM_TypeDef *t) {
+    i2c_bus = i2c;
+    I2C_LowLevel_Init(i2c_bus);
     timer = t;
 
 }
@@ -33,8 +36,8 @@ void bmp180_init(TIM_TypeDef *t) {
 // 0. Check presence of BMP180 in I2C bus
 bool bmp180_check_presence() {
     tx[0] = 0xD0; // Address of device
-    I2C_Master_BufferWrite(I2C1, tx, 1, Polling, BMP180_ADDRESS << 1);
-    I2C_Master_BufferRead(I2C1, rx, 1, Polling, BMP180_ADDRESS << 1);
+    I2C_Master_BufferWrite(i2c_bus, tx, 1, Polling, BMP180_ADDRESS << 1);
+    I2C_Master_BufferRead(i2c_bus, rx, 1, Polling, BMP180_ADDRESS << 1);
 
     if (rx[0] == BMP180_CHIP_ID) {
         return true;
@@ -46,8 +49,8 @@ bool bmp180_check_presence() {
 // 1. Fetch calibration data
 void bmp180_get_calibration_data(CalibrationData *c) {
     tx[0] = 0xAA; // Begin of calibration data, 22 bytes length
-    I2C_Master_BufferWrite(I2C1, tx, 1, Polling, BMP180_ADDRESS << 1);
-    I2C_Master_BufferRead(I2C1, rx, 22, Polling, BMP180_ADDRESS << 1);
+    I2C_Master_BufferWrite(i2c_bus, tx, 1, Polling, BMP180_ADDRESS << 1);
+    I2C_Master_BufferRead(i2c_bus, rx, 22, Polling, BMP180_ADDRESS << 1);
 
     c->AC1 = rx[0] << 8 | rx[1];
     c->AC2 = rx[2] << 8 | rx[3];
@@ -116,14 +119,14 @@ void bmp180_sanity_check2(CalibrationData *c) {
 void bmp180_get_uncompensated_temperature(CalibrationData* data) {
     tx[0] = 0xF4; // Register to write
     tx[1] = 0x2E; // Value to write (measure temperature)
-    I2C_Master_BufferWrite(I2C1, tx, 2, Polling, BMP180_ADDRESS << 1);
+    I2C_Master_BufferWrite(i2c_bus, tx, 2, Polling, BMP180_ADDRESS << 1);
 
     delay_ms(timer, 5);
 
     // Read two bytes
     tx[0] = 0xF6; // Register to read (temperature)
-    I2C_Master_BufferWrite(I2C1, tx, 1, Polling, BMP180_ADDRESS << 1);
-    I2C_Master_BufferRead(I2C1, rx, 2, Polling, BMP180_ADDRESS << 1);
+    I2C_Master_BufferWrite(i2c_bus, tx, 1, Polling, BMP180_ADDRESS << 1);
+    I2C_Master_BufferRead(i2c_bus, rx, 2, Polling, BMP180_ADDRESS << 1);
     data->UT = rx[0] << 8 | rx[1];
 }
 
@@ -131,15 +134,15 @@ void bmp180_get_uncompensated_temperature(CalibrationData* data) {
 void bmp180_get_uncompensated_pressure(CalibrationData* data) {
     tx[0] = 0xF4; // Register to write
     tx[1] = 0x34 | (data->oss << 6); // Value to write (measure pressure)
-    I2C_Master_BufferWrite(I2C1, tx, 2, Polling, BMP180_ADDRESS << 1);
+    I2C_Master_BufferWrite(i2c_bus, tx, 2, Polling, BMP180_ADDRESS << 1);
 
     // Wait for reading
     delay_ms(timer, bmp180_get_delay(data->oss));
 
     // Read two bytes
     tx[0] = 0xF6; // Register to read (pressure)
-    I2C_Master_BufferWrite(I2C1, tx, 1, Polling, BMP180_ADDRESS << 1);
-    I2C_Master_BufferRead(I2C1, rx, 3, Polling, BMP180_ADDRESS << 1);
+    I2C_Master_BufferWrite(i2c_bus, tx, 1, Polling, BMP180_ADDRESS << 1);
+    I2C_Master_BufferRead(i2c_bus, rx, 3, Polling, BMP180_ADDRESS << 1);
     data->UP = (rx[0] << 16 | rx[1] << 8 | rx[2]) >> (8 - data->oss);
 }
 
