@@ -1,11 +1,9 @@
 #include "esp8266.h"
 
-static char custom_command[80];
+static char custom_command[ESP8266_MAX_DATA_LENGTH];
 
 static char AT_command[] = "AT";
 static char terminator[] = "\r\n";
-
-
 
 bool busy = 0;
 
@@ -17,6 +15,103 @@ static Esp8266_mode _mode = ESP8266_MODE_SOFTAP;
 static uint8_t _last_error = 0;
 
 void esp8266_init(void) {}
+
+void esp8266_selfcheck(void) {
+    // Performs self check of available AT commands, note - AP name and password
+    // are provided during compilation
+    // Note: all commands are executed in "temporary mode", i.e. these values
+    // won't be stored in flash memory
+
+    uint8_t error = 0;
+
+    // check if chip is alive
+    esp8266_at();
+    delay_ms(TIM2, 100);
+
+    // get some information about AP
+    error = esp8266_get_ap_info(false);
+    delay_ms(TIM2, 100);
+//    if (error)
+//        hacf();
+
+    // get IP address
+    char* ip_address = esp8266_get_ip_address(false);
+    free(ip_address);
+    delay_ms(TIM2, 100);
+
+    // try setting and checking different modes
+    esp8266_set_mode(ESP8266_MODE_SOFTAP, false);
+    delay_ms(TIM2, 100);
+
+    esp8266_get_mode(false);
+    delay_ms(TIM2, 100);
+
+    esp8266_set_mode(ESP8266_MODE_STATION, false);
+    delay_ms(TIM2, 100);
+
+    esp8266_get_mode(false);
+    delay_ms(TIM2, 100);
+
+    esp8266_set_mode(ESP8266_MODE_SOFTAP_AND_STATION, false);
+    delay_ms(TIM2, 100);
+
+    esp8266_get_mode(false);
+    delay_ms(TIM2, 100);
+
+    esp8266_get_mode(true);
+    delay_ms(TIM2, 100);
+
+    // join AP
+    error = esp8266_join_ap(AP_NAME, AP_PASSWORD, "", false);
+    if (error)
+        hacf();
+
+    /********************************RESET*************************************/
+    esp8266_reset();
+    delay_ms(TIM2, 100);
+
+    esp8266_at();
+    delay_ms(TIM2, 100);
+
+    error = esp8266_get_ap_info(false);
+    if (error)
+        hacf();
+
+    delay_ms(TIM2, 100);
+
+    esp8266_get_version();
+    delay_ms(TIM2, 100);
+
+    esp8266_at();
+    delay_ms(TIM2, 100);
+
+    esp8266_echo_on();
+    delay_ms(TIM2, 100);
+
+    esp8266_at();
+    delay_ms(TIM2, 100);
+
+    esp8266_echo_off();
+    delay_ms(TIM2, 100);
+
+    esp8266_at();
+    delay_ms(TIM2, 100);
+
+    error = esp8266_get_ap_info(false);
+    if (error)
+        hacf();
+    delay_ms(TIM2, 100);
+
+    esp8266_at();
+    delay_ms(TIM2, 100);
+
+//    esp8266_set_static_ip("192.168.0.250", "", "", false);
+
+//    ip_address = esp8266_get_ip_address(false);
+//    free(ip_address);
+//    delay_ms(TIM2, 100);
+
+}
 
 void esp8266_send_command(Type type, Operation operation) {
     while(busy) {}
@@ -104,6 +199,26 @@ void esp8266_send_command(Type type, Operation operation) {
             }
             break;
 
+        case AT_CIPSTART:
+            usart1_print(AT_command);
+            usart1_print("+CIPSTART=");
+            usart1_print(custom_command);
+            break;
+
+        case AT_CIPSEND:
+            usart1_print(AT_command);
+            usart1_print("+CIPSEND=");
+            usart1_print(custom_command);
+            break;
+
+        case AT_CIPSEND_DATA:
+            usart1_print(custom_command);
+            break;
+
+        case AT_CIPCLOSE:
+            usart1_print(AT_command);
+            usart1_print("+CIPCLOSE");
+            break;
 
         default:
             return;
@@ -118,6 +233,12 @@ void esp8266_send_command(Type type, Operation operation) {
 
 bool esp8266_parse_ok(char* string) {
     if (strcmp(string, "OK") == 0)
+        return true;
+    return false;
+}
+
+bool esp8266_parse_error(char* string) {
+    if (strcmp(string, "ERROR") == 0)
         return true;
     return false;
 }
@@ -261,6 +382,54 @@ bool esp8266_parse_cipsta(char* string) {
     return false;
 }
 
+bool esp8266_parse_cipstart(char* string) {
+    static uint8_t state = 0;
+
+    if (state == 0) {
+        if (strcmp(string, "ALREADY CONNECTED") == 0) { // Connection already exists
+            _last_error = 1;
+            state = 1;
+            return false;
+        }
+
+        if (strcmp(string, "CONNECT") == 0) { // Connection established
+            state = 1;
+            return false;
+        }
+    }
+
+    if (state == 1) {
+        if (esp8266_parse_error(string)) { // Problem during establishing connection
+            if (_last_error != 0)
+                _last_error = 2;
+            state = 0;
+            return true;
+        }
+
+        if (esp8266_parse_ok(string)) { // New connection created
+            state = 0;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool esp8266_parse_cipsend(char *string) {
+    if (strcmp(string, "SEND OK") == 0) {
+        return true;
+    }
+    return false;
+}
+
+bool esp8266_parse_cipclose(char *string) {
+    // if there is no connection it's safe to ignore "error" message
+    if (esp8266_parse_error(string) || esp8266_parse_ok(string)) {
+        return true;
+    }
+    return false;
+}
+
 void esp8266_parse_string(char *incoming) {
     switch (_operation) {
         case AT:
@@ -308,6 +477,29 @@ void esp8266_parse_string(char *incoming) {
                     return;
             }
             break;
+
+        case AT_CIPSTART:
+            if (!esp8266_parse_cipstart(incoming))
+                return;
+            break;
+
+        case AT_CIPSEND:
+            if (_type == TYPE_SET_EXECUTE) {
+                if (!esp8266_parse_ok(incoming))
+                    return;
+            }
+            break;
+
+        case AT_CIPSEND_DATA:
+            if (!esp8266_parse_cipsend(incoming))
+                return;
+            break;
+
+        case AT_CIPCLOSE:
+            if (!esp8266_parse_cipclose(incoming))
+                return;
+            break;
+
 
         default:
             return;
@@ -447,6 +639,66 @@ char* esp8266_get_ip_address(bool persistent) {
     esp8266_wait_for_response();
 
     return strdup(custom_command);
+}
+
+uint8_t esp8266_establish_connection(Esp8266_protocol protocol, char *ip_address,
+                                     uint16_t port) {
+
+    if (protocol == ESP8266_PROTOCOL_UDP)
+        sprintf(custom_command, "\"UDP\",\"%s\",%d", ip_address, port);
+    else  // TODO: Not implemented / tested
+        return 1;
+
+    esp8266_send_command(TYPE_SET_EXECUTE, AT_CIPSTART);
+    esp8266_wait_for_response();
+
+    uint8_t error = _last_error;
+    _last_error = 0;
+    return error;
+}
+
+uint8_t esp8266_send_data(char* buffer) {
+    size_t buffer_length = strlen(buffer);
+    if (buffer_length  > ESP8266_MAX_DATA_LENGTH)
+        return 1;
+
+    sprintf(custom_command, "%d", buffer_length);
+
+    esp8266_send_command(TYPE_SET_EXECUTE, AT_CIPSEND);
+    esp8266_wait_for_response();
+
+    delay_ms(TIM2, 100);
+
+    strcpy(custom_command, buffer);
+
+    esp8266_send_command(TYPE_SET_EXECUTE, AT_CIPSEND_DATA);
+    esp8266_wait_for_response();
+
+    return 0;
+}
+
+void esp8266_close_connection(void) {
+    esp8266_send_command(TYPE_SET_EXECUTE, AT_CIPCLOSE);
+    esp8266_wait_for_response();
+}
+
+uint8_t esp8266_udp_send(char* ip_address, uint16_t port, char* data) {
+    uint8_t error = esp8266_establish_connection(ESP8266_PROTOCOL_UDP,
+                                                 ip_address, port);
+    delay_ms(TIM2, 100);
+    if (error)
+        return 1;
+
+    error = esp8266_send_data(data);
+    delay_ms(TIM2, 100);
+
+    if (error)
+        return 2;
+
+    esp8266_close_connection();
+    delay_ms(TIM2, 100);
+
+    return 0;
 }
 
 void esp8266_new_line(char* line) {

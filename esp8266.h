@@ -11,7 +11,7 @@
 #include "common_lib/usart.h"
 #include "common_lib/utils.h"
 
-#include "main.h"
+#define ESP8266_MAX_DATA_LENGTH (2048)
 
 typedef enum {
     AT_CWJAP_DEF,  // Connect to AP or get info about connected AP
@@ -25,6 +25,10 @@ typedef enum {
     AT_GMR, // get version info
     AT_CIPSTA_DEF, // set/get IP address in Station Mode
     AT_CIPSTA_CUR,
+    AT_CIPSTART, // start new IP connection
+    AT_CIPSEND, // send data (after establishing connection)
+    AT_CIPSEND_DATA, // fake command to trigger sending of actual data
+    AT_CIPCLOSE, // close connection
 } Operation;
 
 typedef enum {
@@ -44,7 +48,13 @@ typedef enum {
     ESP8266_MODE_SOFTAP_AND_STATION,
 } Esp8266_mode;
 
+typedef enum {
+    ESP8266_PROTOCOL_UDP,
+    ESP8266_PROTOCOL_TCP,
+} Esp8266_protocol;
+
 void esp8266_init(void);
+void esp8266_selfcheck(void);
 void esp8266_new_line(char* line);
 void esp8266_at(void);
 void esp8266_reset(void);
@@ -58,5 +68,10 @@ uint8_t esp8266_get_ap_info(bool persistent);
 void esp8266_set_static_ip(char* ip_address, char* gateway, char* netmask,
                            bool persistent);
 char* esp8266_get_ip_address(bool persistent);
+uint8_t esp8266_establish_connection(Esp8266_protocol protocol, char* ip_address,
+                                     uint16_t port);
+uint8_t esp8266_send_data(char* buffer);
+void esp8266_close_connection(void);
+uint8_t esp8266_udp_send(char* ip_address, uint16_t port, char *data);
 
 #endif // __ESP8266_H__
