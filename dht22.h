@@ -21,7 +21,7 @@ typedef enum {
     DHT22_EOT = 6,
 } dht22_state;
 
-void dht22_init(GPIO_TypeDef *gpio_, u16 pin_, u8 source_pin_, TIM_TypeDef *timer_);
+void dht22_init(GPIO_TypeDef *gpio_, u16 pin_, u8 source_pin_, TIM_TypeDef *delay_timer_, TIM_TypeDef *interrupt_timer_);
 //void dht22_trigger_state_machine(u32 timer, u8 bit);
 bool dht22_reset_pulse();
 //bool dht22_check_tolerance(u32 timer);

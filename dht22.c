@@ -2,7 +2,8 @@
 
 GPIO_TypeDef *gpio;
 u16 pin;
-TIM_TypeDef *timer;
+TIM_TypeDef *interrupt_timer;
+TIM_TypeDef *delay_timer;
 u8 source_port;
 u8 source_pin;
 u32 interrupt_line;
@@ -16,17 +17,12 @@ u8 data_pos = 0;
 u8 last_temperature = 0;
 u8 last_relative_humidity = 0;
 
-static void dht22_delay_us(unsigned int time) {
-    timer->CNT = 0;
-    time -= 3;
-    while (timer->CNT <= time) {}
-}
-
 // Configures GPIO pin, timer and interrupts
-void dht22_init(GPIO_TypeDef *gpio_, u16 pin_, u8 source_pin_, TIM_TypeDef *timer_) {
+void dht22_init(GPIO_TypeDef *gpio_, u16 pin_, u8 source_pin_, TIM_TypeDef *delay_timer_, TIM_TypeDef *interrupt_timer_) {
     gpio = gpio_;
     pin = pin_;
-    timer = timer_;
+    interrupt_timer = interrupt_timer_;
+    delay_timer = delay_timer_;
     source_pin = source_pin_;
     interrupt_line = pin_;
 
@@ -80,9 +76,9 @@ void dht22_init(GPIO_TypeDef *gpio_, u16 pin_, u8 source_pin_, TIM_TypeDef *time
     EXTI_Init(&EXTI_InitStructure);
 
     // Enable Timer clock
-    if (timer == TIM2) {
+    if (interrupt_timer == TIM2) {
         RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
-    } else if (timer == TIM3) {
+    } else if (interrupt_timer == TIM3) {
         RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
     } else {
         // TODO: not implemented
@@ -96,22 +92,22 @@ void dht22_init(GPIO_TypeDef *gpio_, u16 pin_, u8 source_pin_, TIM_TypeDef *time
     TIM_InitStructure.TIM_Period = 10000 - 1; // Update event every 10000 us (10 ms)
     TIM_InitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
     TIM_InitStructure.TIM_RepetitionCounter = 0;
-    TIM_TimeBaseInit(timer, &TIM_InitStructure);
+    TIM_TimeBaseInit(interrupt_timer, &TIM_InitStructure);
 
-    TIM_Cmd(timer, ENABLE);
+    TIM_Cmd(interrupt_timer, ENABLE);
 }
 
 // Sends reset pulse
 bool dht22_reset_pulse() {
     // Pull bus down for at least 800 us
     GPIO_ResetBits(gpio, pin);
-    dht22_delay_us(1000);
+    delay_us(delay_timer, 1000);
     GPIO_SetBits(gpio, pin);
 
     // Wait for recovery (20-40 us)
     dht22_current_state = DHT22_NONE;
-    TIM_SetCounter(timer, 0);
-    dht22_delay_us(40);
+    TIM_SetCounter(interrupt_timer, 0);
+    delay_us(delay_timer, 40);
 
     return false;
 }
@@ -197,7 +193,7 @@ void dht22_trigger_state_machine(u32 timer, u8 bit) {
 
 void dht22_decode_data() {
     u8 i;
-    char tab[43];
+//    char tab[43];
 //    for (i = 0; i < 40; ++i) {
 //        tab[i] = 48 + data[i];
 //    }
@@ -218,16 +214,16 @@ void dht22_decode_data() {
     u16 rh = rh_high << 8 | rh_low;
     u16 temperature = temp_high << 8 | temp_low;
     u8 sum = rh_high + rh_low + temp_high + temp_low;
-    sprintf(tab, "%d %d %u %u\r\n", temperature, rh, sum, checksum);
+//    sprintf(tab, "%d %d %u %u\r\n", temperature, rh, sum, checksum);
     if (sum == checksum) {
         last_temperature = temperature / 10;
         last_relative_humidity = rh / 10;
     } else {
-        printf("Checksum incorrect\r\n");
+//        printf("Checksum incorrect\r\n");
         last_temperature = 0;
         last_relative_humidity = 0;
     }
-    printf(tab);
+//    printf(tab);
 }
 
 u8 dht22_get_temperature() {
@@ -251,8 +247,8 @@ void EXTI9_5_IRQHandler(void) {
 //            }
 
             // Restart Timer
-            counter = TIM_GetCounter(timer);
-            TIM_SetCounter(timer, 0);
+            counter = TIM_GetCounter(interrupt_timer);
+            TIM_SetCounter(interrupt_timer, 0);
             dht22_trigger_state_machine(counter, bit);
         }
 
