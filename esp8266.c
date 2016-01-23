@@ -14,7 +14,14 @@ static Esp8266_mode _mode = ESP8266_MODE_SOFTAP;
 
 static uint8_t _last_error = 0;
 
-void esp8266_init(void) {}
+void esp8266_init(void) {
+    esp8266_at();
+    delay_ms(TIM2, 100);
+    esp8266_at();
+    delay_ms(TIM2, 100);
+    esp8266_echo_off();
+    delay_ms(TIM2, 100);
+}
 
 void esp8266_selfcheck(void) {
     // Performs self check of available AT commands, note - AP name and password
@@ -220,6 +227,22 @@ void esp8266_send_command(Type type, Operation operation) {
             usart1_print("+CIPCLOSE");
             break;
 
+        case AT_CIPSTAMAC_CUR:
+        case AT_CIPSTAMAC_DEF:
+            usart1_print(AT_command);
+            usart1_print("+CIPSTAMAC_");
+
+            if (operation == AT_CIPSTAMAC_CUR)
+                usart1_print("CUR");
+            else
+                usart1_print("DEF");
+
+            if (type == TYPE_QUERY) {
+                usart1_print("?");
+            }
+            break;
+
+
         default:
             return;
 
@@ -244,6 +267,9 @@ bool esp8266_parse_error(char* string) {
 }
 
 bool esp8266_parse_ready(char* string) {
+    if (strcmp(string, "ready") == 0)
+        return false;
+    // Note: code below will work only if AP information is stored permanently
     if (strcmp(string, "WIFI GOT IP") == 0)
         return true;
     return false;
@@ -430,6 +456,29 @@ bool esp8266_parse_cipclose(char *string) {
     return false;
 }
 
+bool esp8266_parse_cipstamac(char *string) {
+    static uint8_t state = 0;
+    static char match[] = "+CIPSTAMAC_";
+
+    if (state == 0) {
+        if (strncmp(string, match, strlen(match)) == 0) {
+            // Reply in format: +CIPSTAMAC_DEF="<MAC>"
+            char* mac_address = &string[0] + strlen(match) + 4 + 1;
+
+            state = 1;
+            strncpy(custom_command, mac_address, strlen(mac_address) - 1);
+
+            return false;
+        }
+    } else if (state == 1) {
+        if (esp8266_parse_ok(string)) {
+            state = 0;
+            return true;
+        }
+    }
+    return false;
+}
+
 void esp8266_parse_string(char *incoming) {
     switch (_operation) {
         case AT:
@@ -500,6 +549,12 @@ void esp8266_parse_string(char *incoming) {
                 return;
             break;
 
+        case AT_CIPSTAMAC_CUR:
+        case AT_CIPSTAMAC_DEF:
+            if (!esp8266_parse_cipstamac(incoming))
+                return;
+
+            break;
 
         default:
             return;
@@ -699,6 +754,16 @@ uint8_t esp8266_udp_send(char* ip_address, uint16_t port, char* data) {
     delay_ms(TIM2, 100);
 
     return 0;
+}
+
+char* esp8266_get_mac_address(bool persistent) {
+    if (persistent)
+        esp8266_send_command(TYPE_QUERY, AT_CIPSTAMAC_DEF);
+    else
+        esp8266_send_command(TYPE_QUERY, AT_CIPSTAMAC_CUR);
+    esp8266_wait_for_response();
+
+    return strdup(custom_command);
 }
 
 void esp8266_new_line(char* line) {

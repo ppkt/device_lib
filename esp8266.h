@@ -29,6 +29,8 @@ typedef enum {
     AT_CIPSEND, // send data (after establishing connection)
     AT_CIPSEND_DATA, // fake command to trigger sending of actual data
     AT_CIPCLOSE, // close connection
+    AT_CIPSTAMAC_DEF, // sef/get MAC address in Station Mode
+    AT_CIPSTAMAC_CUR,
 } Operation;
 
 typedef enum {
@@ -73,5 +75,6 @@ uint8_t esp8266_establish_connection(Esp8266_protocol protocol, char* ip_address
 uint8_t esp8266_send_data(char* buffer);
 void esp8266_close_connection(void);
 uint8_t esp8266_udp_send(char* ip_address, uint16_t port, char *data);
+char* esp8266_get_mac_address(bool persistent);
 
 #endif // __ESP8266_H__
