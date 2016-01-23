@@ -14,6 +14,9 @@ static Esp8266_mode _mode = ESP8266_MODE_SOFTAP;
 
 static uint8_t _last_error = 0;
 
+// pointer to callback function, called on each incoming packet
+static void (*_callback)(char* string, uint8_t size);
+
 void esp8266_init(void) {
     esp8266_at();
     delay_ms(TIM2, 100);
@@ -479,6 +482,25 @@ bool esp8266_parse_cipstamac(char *string) {
     return false;
 }
 
+bool esp8266_parse_packet(char *string) {
+    static char match[] = "+IPD";
+
+    if (strncmp(string, match, strlen(match)) == 0) {
+        // Incoming packet is in format:
+        // +IPD,<len>:<data>
+
+        char* packet = &string[0] + strlen(match) + 1; // remove "+IPD,"
+
+        // start of data
+        char* data = strstr(packet, ":") + 1;
+
+        // FIXME: parse received length of packet instead using strlen
+        _callback(data, strlen(data));
+
+    }
+    return false;
+}
+
 void esp8266_parse_string(char *incoming) {
     switch (_operation) {
         case AT:
@@ -557,10 +579,13 @@ void esp8266_parse_string(char *incoming) {
             break;
 
         default:
-            return;
+            if (!esp8266_parse_packet(incoming))
+                return;
+            break;
     }
 
     busy = false;
+    _operation = NOP;
 
 }
 
@@ -701,6 +726,31 @@ uint8_t esp8266_establish_connection(Esp8266_protocol protocol, char *ip_address
 
     if (protocol == ESP8266_PROTOCOL_UDP)
         sprintf(custom_command, "\"UDP\",\"%s\",%d", ip_address, port);
+    else  // TODO: Not implemented / tested
+        return 1;
+
+    esp8266_send_command(TYPE_SET_EXECUTE, AT_CIPSTART);
+    esp8266_wait_for_response();
+
+    uint8_t error = _last_error;
+    _last_error = 0;
+    return error;
+}
+
+// Establish two-way connection (ie. for sending AND receiving data)
+uint8_t esp8266_establish_two_way_connection(Esp8266_protocol protocol,
+                                             char *ip_address,
+                                             uint16_t source_port,
+                                             uint16_t destination_port,
+                                             uint8_t mode,
+                                             void (*callback)(char* string,
+                                                              uint8_t size)) {
+
+    _callback = callback;
+
+    if (protocol == ESP8266_PROTOCOL_UDP)
+        sprintf(custom_command, "\"UDP\",\"%s\",%d,%d,%d", ip_address,
+                source_port, destination_port, mode);
     else  // TODO: Not implemented / tested
         return 1;
 

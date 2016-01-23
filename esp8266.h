@@ -14,6 +14,7 @@
 #define ESP8266_MAX_DATA_LENGTH (2048)
 
 typedef enum {
+    NOP,  // No operation
     AT_CWJAP_DEF,  // Connect to AP or get info about connected AP
     AT_CWJAP_CUR,
     AT, // Check module presence
@@ -70,8 +71,15 @@ uint8_t esp8266_get_ap_info(bool persistent);
 void esp8266_set_static_ip(char* ip_address, char* gateway, char* netmask,
                            bool persistent);
 char* esp8266_get_ip_address(bool persistent);
-uint8_t esp8266_establish_connection(Esp8266_protocol protocol, char* ip_address,
-                                     uint16_t port);
+uint8_t esp8266_establish_connection(Esp8266_protocol protocol,
+                                     char* ip_address, uint16_t port);
+uint8_t esp8266_establish_two_way_connection(Esp8266_protocol protocol,
+                                             char *ip_address,
+                                             uint16_t source_port,
+                                             uint16_t destination_port,
+                                             uint8_t mode,
+                                             void (*callback)(char* string,
+                                                              uint8_t size));
 uint8_t esp8266_send_data(char* buffer);
 void esp8266_close_connection(void);
 uint8_t esp8266_udp_send(char* ip_address, uint16_t port, char *data);
