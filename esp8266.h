@@ -56,7 +56,7 @@ typedef enum {
     ESP8266_PROTOCOL_TCP,
 } Esp8266_protocol;
 
-void esp8266_init(void);
+void esp8266_init(TIM_TypeDef *delay_timer);
 void esp8266_selfcheck(void);
 void esp8266_new_line(char* line);
 void esp8266_at(void);

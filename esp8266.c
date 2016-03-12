@@ -17,13 +17,17 @@ static uint8_t _last_error = 0;
 // pointer to callback function, called on each incoming packet
 static void (*_callback)(char* string, uint8_t size) = 0;
 
-void esp8266_init(void) {
+// pointer to timer
+TIM_TypeDef *timer;
+
+void esp8266_init(TIM_TypeDef *delay_timer) {
+    timer = delay_timer;
     esp8266_at();
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
     esp8266_at();
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
     esp8266_echo_off();
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
 }
 
 void esp8266_selfcheck(void) {
@@ -36,40 +40,40 @@ void esp8266_selfcheck(void) {
 
     // check if chip is alive
     esp8266_at();
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
 
     // get some information about AP
     error = esp8266_get_ap_info(false);
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
 //    if (error)
 //        hacf();
 
     // get IP address
     char* ip_address = esp8266_get_ip_address(false);
     free(ip_address);
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
 
     // try setting and checking different modes
     esp8266_set_mode(ESP8266_MODE_SOFTAP, false);
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
 
     esp8266_get_mode(false);
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
 
     esp8266_set_mode(ESP8266_MODE_STATION, false);
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
 
     esp8266_get_mode(false);
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
 
     esp8266_set_mode(ESP8266_MODE_SOFTAP_AND_STATION, false);
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
 
     esp8266_get_mode(false);
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
 
     esp8266_get_mode(true);
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
 
     // join AP
     error = esp8266_join_ap(AP_NAME, AP_PASSWORD, "", false);
@@ -78,42 +82,42 @@ void esp8266_selfcheck(void) {
 
     /********************************RESET*************************************/
     esp8266_reset();
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
 
     esp8266_at();
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
 
     error = esp8266_get_ap_info(false);
     if (error)
         hacf();
 
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
 
     esp8266_get_version();
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
 
     esp8266_at();
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
 
     esp8266_echo_on();
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
 
     esp8266_at();
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
 
     esp8266_echo_off();
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
 
     esp8266_at();
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
 
     error = esp8266_get_ap_info(false);
     if (error)
         hacf();
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
 
     esp8266_at();
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
 
 //    esp8266_set_static_ip("192.168.0.250", "", "", false);
 
@@ -773,7 +777,7 @@ uint8_t esp8266_send_data(char* buffer) {
     esp8266_send_command(TYPE_SET_EXECUTE, AT_CIPSEND);
     esp8266_wait_for_response();
 
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
 
     strcpy(custom_command, buffer);
 
@@ -791,18 +795,18 @@ void esp8266_close_connection(void) {
 uint8_t esp8266_udp_send(char* ip_address, uint16_t port, char* data) {
     uint8_t error = esp8266_establish_connection(ESP8266_PROTOCOL_UDP,
                                                  ip_address, port);
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
     if (error)
         return 1;
 
     error = esp8266_send_data(data);
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
 
     if (error)
         return 2;
 
     esp8266_close_connection();
-    delay_ms(TIM2, 100);
+    delay_ms(timer, 100);
 
     return 0;
 }
