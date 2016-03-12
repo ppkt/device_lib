@@ -16,7 +16,7 @@ void rda5807_init(TIM_TypeDef *timer) {
     I2C_Master_BufferRead(I2C1, rx, 2, DMA, RDA5970_ADDRESS << 1);
 
     if (rx[0] == RDA5970_ID) {
-        printf("Chip is present\n\r");
+//        printf("Chip is present\n\r");
     }
 
     // Reset radio
@@ -32,7 +32,7 @@ void rda5807_init(TIM_TypeDef *timer) {
     I2C_Master_BufferWrite(I2C1, tx, 3, DMA, RDA5970_ADDRESS << 1);
     delay_ms(timer, 500);
 
-    printf("Configuration done\r\n");
+//    printf("Configuration done\r\n");
 }
 
 void rda5807_set_frequency(u16 new_frequency) {
