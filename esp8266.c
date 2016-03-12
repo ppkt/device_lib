@@ -15,7 +15,7 @@ static Esp8266_mode _mode = ESP8266_MODE_SOFTAP;
 static uint8_t _last_error = 0;
 
 // pointer to callback function, called on each incoming packet
-static void (*_callback)(char* string, uint8_t size);
+static void (*_callback)(char* string, uint8_t size) = 0;
 
 void esp8266_init(void) {
     esp8266_at();
@@ -495,7 +495,8 @@ bool esp8266_parse_packet(char *string) {
         char* data = strstr(packet, ":") + 1;
 
         // FIXME: parse received length of packet instead using strlen
-        _callback(data, strlen(data));
+        if (_callback)
+            _callback(data, strlen(data));
 
     }
     return false;
