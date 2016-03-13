@@ -16,7 +16,7 @@
  *
  */
 
-u8 backlight = 1 << 3;
+u8 backlight = 0 << 3;
 u8 en        = 1 << 2;
 u8 rw        = 1 << 1;
 u8 rs        = 1 << 0;
@@ -82,7 +82,7 @@ void hd44780_go_to(u8 row, u8 col) {
     hd44780_go_to_line(row);
     u8 i = 0;
     while (i++ < col)
-        hd44780_cmd(0x14);
+        hd44780_cmd(HD44780_MOVE_CURSOR_RIGHT);
 }
 
 void hd44780_cgram_write(u8 pos, u8 data_[8]) {
@@ -115,14 +115,14 @@ void hd44780_init(TIM_TypeDef *t) {
     delay_us(timer, 5000);
     hd44780_cmd(0x03);
     delay_us(timer, 100);
-    hd44780_cmd(0x02);
+    hd44780_cmd(HD44780_MOVE_TO_HOME);
     delay_us(timer, 200);
 
     hd44780_cmd(0x28); // 4 bit mode
     hd44780_cmd(0x06); // set direction of cursor to right
-    hd44780_cmd(0x01); // clear display, go to 0x0
-    hd44780_cmd(0x0E); // turn on display, set solid cursor
-    hd44780_cmd(0x0C); // turn on display, set invisiblecursor
+    hd44780_cmd(HD44780_DISPLAY_ERASE); // clear display, go to 0x0
+//    hd44780_cmd(0x0E); // turn on display, set solid cursor
+    hd44780_cmd(HD44780_DISPLAY_SHOW); // turn on display, set invisiblecursor
 
 //    u8 arr[] = {0,10,31,31,14,4,0,0};
 //    u8 arr2[]= {0,10,21,17,10,4,0,0};
@@ -132,7 +132,7 @@ void hd44780_init(TIM_TypeDef *t) {
 
     hd44780_cmd(0x01); // clear display, go to 0x0
 
-    hd44780_backlight(true);
+//    hd44780_backlight(initial_backlight);
 //    hd44780_print("Linia 0");
 //    hd44780_go_to_line(1);
 //    hd44780_print("Linia 1");
