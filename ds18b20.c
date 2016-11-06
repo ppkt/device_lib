@@ -1,8 +1,8 @@
 #include "ds18b20.h"
 
-static u8 precission = 3;
+static uint8_t precission = 3;
 static one_wire_device *one_wire_list_of_devices;
-static u8 one_wire_devices_list_size = 10;
+static uint8_t one_wire_devices_list_size = 10;
 static TIM_TypeDef *timer;
 
 void ds18b20_init(GPIO_TypeDef *gpio, uint16_t port, TIM_TypeDef *t) {
@@ -76,7 +76,7 @@ simple_float ds18b20_read_temperature(one_wire_device device) {
 }
 
 simple_float* ds18b20_read_temperature_all(void) {
-    u8 i = 0;
+    uint8_t i = 0;
     simple_float *temperatures;
     temperatures = malloc(one_wire_devices_list_size * sizeof(simple_float));
 
@@ -88,8 +88,8 @@ simple_float* ds18b20_read_temperature_all(void) {
 
 simple_float ds18b20_decode_temperature(void) {
     int i;
-    u8 crc;
-    u8 data[9];
+    uint8_t crc;
+    uint8_t data[9];
     simple_float f;
     f.is_valid = false;
     one_wire_reset_crc();
@@ -107,7 +107,7 @@ simple_float ds18b20_decode_temperature(void) {
     float temp = (temp_msb << 8 | temp_lsb) / 16.0;
     int rest = (temp - (int)temp) * 1000.0;
 
-    f.integer = (u8)temp;
+    f.integer = (uint8_t)temp;
     f.fractional = rest;
     f.is_valid = true;
 

@@ -4,6 +4,7 @@
 //#include <math.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "common_lib/one_wire.h"
 #include "common_lib/utils.h"
