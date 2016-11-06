@@ -98,12 +98,14 @@ simple_float ds18b20_decode_temperature(void) {
         data[i] = one_wire_read_byte();
         crc = one_wire_crc(data[i]);
     }
-    if (crc != 0) {
+
+    uint8_t temp_msb = data[1]; // Sign byte + lsbit
+    uint8_t temp_lsb = data[0]; // Temp data plus lsb
+
+    if (crc != 0 || (!crc && !temp_msb && !temp_lsb)) {
         return f;
     }
 
-    u8 temp_msb = data[1]; // Sign byte + lsbit
-    u8 temp_lsb = data[0]; // Temp data plus lsb
     float temp = (temp_msb << 8 | temp_lsb) / 16.0;
     int rest = (temp - (int)temp) * 1000.0;
 
