@@ -9,6 +9,8 @@
 #include "stm32f10x_exti.h"
 #include "stm32f10x_misc.h"
 
+#include "common_lib/utils.h"
+
 // Keep value in sync!
 #define DHT22_STATE_SIZE 7
 typedef enum {
