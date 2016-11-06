@@ -129,3 +129,9 @@ void ds18b20_wait_for_conversion(void) {
     }
 }
 
+
+simple_float ds18b20_get_temperature_simple(void) {
+    ds18b20_convert_temperature_simple();  // we have only one device
+    ds18b20_wait_for_conversion();
+    return ds18b20_read_temperature_simple();
+}

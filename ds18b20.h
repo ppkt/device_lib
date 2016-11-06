@@ -36,4 +36,6 @@ simple_float* ds18b20_read_temperature_all(void);
 void ds18b20_wait_for_conversion(void);
 simple_float ds18b20_decode_temperature(void);
 
+simple_float ds18b20_get_temperature_simple(void);
+
 #endif // __DS18B20_H__
