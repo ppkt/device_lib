@@ -106,7 +106,7 @@ simple_float ds18b20_decode_temperature(void) {
         return f;
     }
 
-    float temp = (temp_msb << 8 | temp_lsb) / 16.0;
+    float temp = (int16_t)(temp_msb << 8 | temp_lsb) / 16.0;
     int rest = (temp - (int)temp) * 1000.0;
 
     f.integer = (uint8_t)temp;
