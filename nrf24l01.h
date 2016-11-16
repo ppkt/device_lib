@@ -97,7 +97,7 @@ void nrf24l01_set_rx_address(nrf24l01_context *ctx,
 
 void nrf24l01_activate_dynamic_payload(nrf24l01_context *ctx);
 void nrf24l01_enable_dynamic_payload(nrf24l01_context *ctx, uint8_t pipe);
-
+char *nrf24l01_receive_payload_dynamic(nrf24l01_context *ctx);
 // Low level API
 //void nrf24l01_ce(nrf24l01_context ctx, bool new_state);
 

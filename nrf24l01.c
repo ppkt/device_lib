@@ -1,7 +1,7 @@
 #include "nrf24l01.h"
 
-uint8_t tx[32];
-uint8_t rx[32];
+uint8_t tx[33];
+uint8_t rx[33];
 
 // Writes 1 on all NSS pins
 void nrf24l01_deselect_device(nrf24l01_context *ctx) {
@@ -241,13 +241,17 @@ uint8_t nrf24l01_receive_payload_static(nrf24l01_context *ctx, uint8_t bytes) {
     return 0;
 }
 
-uint8_t nrf24l01_receive_payload_dynamic(nrf24l01_context *ctx, uint8_t bytes) {
+char* nrf24l01_receive_payload_dynamic(nrf24l01_context *ctx) {
     // check number of bytes
-    uint8_t buffer[5];
+    static uint8_t buffer[5];
     nrf24l01_send_command_multiple(ctx, R_RX_PL_WID, &buffer, 1);
 
+    if (buffer[0] > 32)
+        buffer[0] = 32;
+
     nrf24l01_send_command_multiple(ctx, R_RX_PAYLOAD, tx, buffer[0]);
-//    return 0;
+
+    return strndup((char*)tx, 32);
 }
 
 // Important note:
