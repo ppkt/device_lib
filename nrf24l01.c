@@ -241,17 +241,18 @@ uint8_t nrf24l01_receive_payload_static(nrf24l01_context *ctx, uint8_t bytes) {
     return 0;
 }
 
-char* nrf24l01_receive_payload_dynamic(nrf24l01_context *ctx) {
+uint8_t* nrf24l01_receive_payload_dynamic(nrf24l01_context *ctx) {
     // check number of bytes
     static uint8_t buffer[5];
     nrf24l01_send_command_multiple(ctx, R_RX_PL_WID, &buffer, 1);
 
-    if (buffer[0] > 32)
-        buffer[0] = 32;
-
+    // in buffer[0] there is a number of bytes of dynamic payload
     nrf24l01_send_command_multiple(ctx, R_RX_PAYLOAD, tx, buffer[0]);
 
-    return strndup((char*)tx, 32);
+    uint8_t *ret = malloc(sizeof(uint8_t) * buffer[0]);
+    memcpy(ret, tx, buffer[0]);
+
+    return ret;
 }
 
 // Important note:
