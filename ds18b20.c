@@ -109,8 +109,8 @@ simple_float ds18b20_decode_temperature(void) {
     float temp = (int16_t)(temp_msb << 8 | temp_lsb) / 16.0;
     int rest = (temp - (int)temp) * 1000.0;
 
-    f.integer = (uint8_t)temp;
-    f.fractional = rest;
+    f.integer = (int8_t)temp;
+    f.fractional = abs(rest);
     f.is_valid = true;
 
 //    char buffer[10];
