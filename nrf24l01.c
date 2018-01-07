@@ -100,15 +100,15 @@ nrf24l01_context* nrf24l01_init(uint8_t device_id, SPI_TypeDef *spi,
     nrf24l01_write_register(ctx, CONFIG, init_buffer, 1);
 
     // Setup Auto-Ack on pipe 0
-    init_buffer[0] = 0x01; // enable AA
-    init_buffer[0] = 0x00; // disable AA
+    init_buffer[0] = 0x0F; // enable AA
+//    init_buffer[0] = 0x00; // disable AA
     nrf24l01_write_register(ctx, EN_AA, init_buffer, 1);
 
     // Address Widths - 5 bytes RF address
     init_buffer[0] = 0x03;
     nrf24l01_write_register(ctx, SETUP_AW, init_buffer, 1);
 
-    nrf24l01_setup_automatic_retransmission(ctx, 250, 15);
+    nrf24l01_setup_automatic_retransmission(ctx, 4000, 15);
 
     // Set channel to 2 - 2.402 GHz
     init_buffer[0] = 0x02;
@@ -155,8 +155,10 @@ nrf24l01_context* nrf24l01_init(uint8_t device_id, SPI_TypeDef *spi,
 }
 
 // Return content of STATUS register
-uint8_t nrf24l01_status(nrf24l01_context *ctx) {
-    return nrf24l01_send_command_single(ctx, NOP);
+nrf24l01_status_reg nrf24l01_status(nrf24l01_context *ctx) {
+    uint8_t data = nrf24l01_send_command_single(ctx, NOP);
+    nrf24l01_status_reg s = { .data = data };
+    return s;
 }
 
 // If device is a receiver, listen
@@ -241,17 +243,24 @@ uint8_t nrf24l01_receive_payload_static(nrf24l01_context *ctx, uint8_t bytes) {
     return 0;
 }
 
-uint8_t* nrf24l01_receive_payload_dynamic(nrf24l01_context *ctx) {
+uint8_t* nrf24l01_receive_payload_dynamic(nrf24l01_context *ctx,
+                                          uint8_t *length) {
     // check number of bytes
     static uint8_t buffer[5];
-    nrf24l01_send_command_multiple(ctx, R_RX_PL_WID, &buffer, 1);
+    nrf24l01_send_command_multiple(ctx, R_RX_PL_WID, buffer, 1);
+    *length = buffer[0];
+
+    if (*length > 32) {
+        // Invalid packet arrived
+        *length = 0;
+        nrf24l01_send_command_single(ctx, FLUSH_RX);
+    }
 
     // in buffer[0] there is a number of bytes of dynamic payload
-    nrf24l01_send_command_multiple(ctx, R_RX_PAYLOAD, tx, buffer[0]);
+    nrf24l01_send_command_multiple(ctx, R_RX_PAYLOAD, tx, *length);
 
-    uint8_t *ret = malloc(sizeof(uint8_t) * buffer[0]);
-    memcpy(ret, tx, buffer[0]);
-
+    uint8_t *ret = malloc(sizeof(uint8_t) * (*length));
+    memcpy(ret, tx, *length);
     return ret;
 }
 
@@ -333,4 +342,164 @@ void nrf24l01_enable_dynamic_payload(nrf24l01_context *ctx, uint8_t pipe) {
     uint8_t buffer[] = {1 << pipe};
     nrf24l01_write_register(ctx, DYNPD, buffer, 1);
 
+}
+
+void print_field(char* name, uint8_t reg, uint8_t pos, uint8_t length,
+                 uint8_t def) {
+
+    if (length > 0) {
+        usart_printf(USART1, "\t%-11.11s\t%i\t%i\r\n",
+                     name, (reg >> pos) & length, def);
+    } else {
+        usart_printf(USART1, "\t%-11.11s\t- \t- \r\n", name);
+    }
+
+}
+
+void nrf24l01_print_register_map(nrf24l01_context *ctx) {
+    nrf24l01_read_register(ctx, CONFIG, rx, 1);
+    usart_printf(USART1, "[CONFIG] 0x%02x\r\n", rx[1]);
+    print_field("[RESERVED]",   rx[1], 7, 1, 0);
+    print_field("MASK_RX_DR",   rx[1], 6, 1, 0);
+    print_field("MASK_RX_DS",   rx[1], 5, 1, 0);
+    print_field("MASK_MAX_RT",  rx[1], 4, 1, 0);
+    print_field("EN_CRC",       rx[1], 3, 1, 1);
+    print_field("CRCO",         rx[1], 2, 1, 0);
+    print_field("PWR_UP",       rx[1], 1, 1, 0);
+    print_field("PRIM_RX",      rx[1], 0, 1, 0);
+
+    nrf24l01_read_register(ctx, EN_AA, rx, 1);
+    usart_printf(USART1, "[EN_AA] 0x%02x\r\n", rx[1]);
+    print_field("[RESERVED]",   rx[1], 6, 2, 0);
+    print_field("ENAA_P5",      rx[1], 5, 1, 1);
+    print_field("ENAA_P4",      rx[1], 4, 1, 1);
+    print_field("ENAA_P3",      rx[1], 3, 1, 1);
+    print_field("ENAA_P2",      rx[1], 2, 1, 1);
+    print_field("ENAA_P1",      rx[1], 1, 1, 1);
+    print_field("ENAA_P0",      rx[1], 0, 1, 1);
+
+    nrf24l01_read_register(ctx, EN_RXADDR, rx, 1);
+    usart_printf(USART1, "[EN_RXADDR] 0x%02x\r\n", rx[1]);
+    print_field("[RESERVED]",   rx[1], 6, 2, 0);
+    print_field("ERX_P5",       rx[1], 5, 1, 0);
+    print_field("ERX_P4",       rx[1], 4, 1, 0);
+    print_field("ERX_P3",       rx[1], 3, 1, 0);
+    print_field("ERX_P2",       rx[1], 2, 1, 0);
+    print_field("ERX_P1",       rx[1], 1, 1, 1);
+    print_field("ERX_P0",       rx[1], 0, 1, 1);
+
+    nrf24l01_read_register(ctx, SETUP_AW, rx, 1);
+    usart_printf(USART1, "[SETUP_AW] 0x%02x\r\n", rx[1]);
+    print_field("[RESERVED]",   rx[1], 2, 5, 0);
+    print_field("AW",           rx[1], 0, 2, 0b11);
+
+    nrf24l01_read_register(ctx, SETUP_RETR, rx, 1);
+    usart_printf(USART1, "[SETUP_RETR] 0x%02x\r\n", rx[1]);
+    print_field("ARD",  rx[1], 3, 4, 0);
+    print_field("ARC",  rx[1], 0, 4, 3);
+
+    nrf24l01_read_register(ctx, RF_CH, rx, 1);
+    usart_printf(USART1, "[SETUP_RETR] 0x%02x\r\n", rx[1]);
+    print_field("[RESERVED]",   rx[1], 7, 1, 0);
+    print_field("RF_CH",        rx[1], 0, 7, 0b10);
+
+    nrf24l01_read_register(ctx, RF_SETUP, rx, 1);
+    usart_printf(USART1, "[RF_SETUP] 0x%02x\r\n", rx[1]);
+    print_field("CONT_WAVE",    rx[1], 7, 1, 0);
+    print_field("[RESERVED]",   rx[1], 6, 1, 0);
+    print_field("RF_DR_LOW",    rx[1], 5, 1, 0);
+    print_field("PLL_LOCK",     rx[1], 4, 1, 0);
+    print_field("RF_DR_HIGH",   rx[1], 3, 1, 1);
+    print_field("RF_PWR",       rx[1], 1, 2, 0b11);
+    print_field("[OBSOLETE]",   rx[1], 0, 0, 0);
+
+    nrf24l01_read_register(ctx, STATUS, rx, 1);
+    usart_printf(USART1, "[STATUS] 0x%02x\r\n", rx[1]);
+    print_field("[RESERVED]",   rx[1], 7, 1, 0);
+    print_field("RX_DR",        rx[1], 6, 1, 0);
+    print_field("TX_DS",        rx[1], 5, 1, 0);
+    print_field("MAX_RT",       rx[1], 4, 1, 0);
+    print_field("RX_P_NO",      rx[1], 1, 3, 0b111);
+    print_field("TX_FULL",      rx[1], 0, 1, 0);
+
+    nrf24l01_read_register(ctx, OBSERVE_TX, rx, 1);
+    usart_printf(USART1, "[OBSERVE_TX] 0x%02x\r\n", rx[1]);
+    print_field("PLOS_CNT",     rx[1], 3, 4, 0);
+    print_field("ARC_CNT",      rx[1], 0, 4, 0);
+
+    nrf24l01_read_register(ctx, RX_ADDR_P0, rx, 5);
+    usart_printf(USART1, "[RX_ADDR_P0] 0x%02x%02x%02x%02x%02x\r\n",
+                 rx[1], rx[2], rx[3], rx[4], rx[5]);
+    nrf24l01_read_register(ctx, RX_ADDR_P1, rx, 5);
+    usart_printf(USART1, "[RX_ADDR_P1] 0x%02x%02x%02x%02x%02x\r\n",
+                 rx[1], rx[2], rx[3], rx[4], rx[5]);
+    nrf24l01_read_register(ctx, RX_ADDR_P2, rx, 1);
+    usart_printf(USART1, "[RX_ADDR_P2]           %02x\r\n", rx[1]);
+    nrf24l01_read_register(ctx, RX_ADDR_P3, rx, 1);
+    usart_printf(USART1, "[RX_ADDR_P3]           %02x\r\n", rx[1]);
+    nrf24l01_read_register(ctx, RX_ADDR_P4, rx, 1);
+    usart_printf(USART1, "[RX_ADDR_P4]           %02x\r\n", rx[1]);
+    nrf24l01_read_register(ctx, RX_ADDR_P5, rx, 1);
+    usart_printf(USART1, "[RX_ADDR_P5]           %02x\r\n", rx[1]);
+
+    nrf24l01_read_register(ctx, TX_ADDR, rx, 5);
+    usart_printf(USART1, "[TX_ADDR] 0x%02x%02x%02x%02x%02x\r\n",
+                 rx[1], rx[2], rx[3], rx[4], rx[5]);
+
+    nrf24l01_read_register(ctx, RX_PW_P0, rx, 1);
+    usart_printf(USART1, "[RX_PW_P0] 0x%02x\r\n", rx[1]);
+    print_field("[RESERVED]",   rx[1], 6, 2, 0);
+    print_field("RX_PW_P0",     rx[1], 0, 5, 0);
+
+    nrf24l01_read_register(ctx, RX_PW_P1, rx, 1);
+    usart_printf(USART1, "[RX_PW_P1] 0x%02x\r\n", rx[1]);
+    print_field("[RESERVED]",   rx[1], 6, 2, 0);
+    print_field("RX_PW_P1",     rx[1], 0, 5, 0);
+
+    nrf24l01_read_register(ctx, RX_PW_P2, rx, 1);
+    usart_printf(USART1, "[RX_PW_P2] 0x%02x\r\n", rx[1]);
+    print_field("[RESERVED]",   rx[1], 6, 2, 0);
+    print_field("RX_PW_P2",     rx[1], 0, 5, 0);
+
+    nrf24l01_read_register(ctx, RX_PW_P3, rx, 1);
+    usart_printf(USART1, "[RX_PW_P3] 0x%02x\r\n", rx[1]);
+    print_field("[RESERVED]",   rx[1], 6, 2, 0);
+    print_field("RX_PW_P3",     rx[1], 0, 5, 0);
+
+    nrf24l01_read_register(ctx, RX_PW_P4, rx, 1);
+    usart_printf(USART1, "[RX_PW_P4] 0x%02x\r\n", rx[1]);
+    print_field("[RESERVED]",   rx[1], 6, 2, 0);
+    print_field("RX_PW_P4",     rx[1], 0, 5, 0);
+
+    nrf24l01_read_register(ctx, RX_PW_P5, rx, 1);
+    usart_printf(USART1, "[RX_PW_P5] 0x%02x\r\n", rx[1]);
+    print_field("[RESERVED]",   rx[1], 6, 2, 0);
+    print_field("RX_PW_P5",     rx[1], 0, 5, 0);
+
+    nrf24l01_read_register(ctx, FIFO_STATUS, rx, 1);
+    usart_printf(USART1, "[FIFO_STATUS] 0x%02x\r\n", rx[1]);
+    print_field("[RESERVED]",   rx[1], 7, 1, 0);
+    print_field("TX_REUSE",     rx[1], 6, 1, 0);
+    print_field("TX_FULL",      rx[1], 5, 1, 0);
+    print_field("TX_EMPTY",     rx[1], 4, 1, 1);
+    print_field("[RESERVED]",   rx[1], 2, 2, 0);
+    print_field("RX_FULL",      rx[1], 1, 1, 0);
+    print_field("RX_EMPTY",     rx[1], 0, 1, 1);
+
+    nrf24l01_read_register(ctx, DYNPD, rx, 1);
+    usart_printf(USART1, "[DYNPD] 0x%02x\r\n", rx[1]);
+    print_field("[RESERVED]",   rx[1], 6, 1, 0);
+    print_field("DPL_P5",       rx[1], 5, 1, 0);
+    print_field("DPL_P4",       rx[1], 4, 1, 0);
+    print_field("DPL_P3",       rx[1], 3, 1, 0);
+    print_field("DPL_P2",       rx[1], 2, 1, 0);
+    print_field("DPL_P1",       rx[1], 1, 1, 0);
+    print_field("DPL_P0",       rx[1], 0, 1, 0);
+
+    nrf24l01_read_register(ctx, FEATURE, rx, 1);
+    usart_printf(USART1, "[FEATURE] 0x%02x\r\n", rx[1]);
+    print_field("[RESERVED]",   rx[1], 3, 5, 0);
+    print_field("EN_DPL",       rx[1], 2, 1, 0);
+    print_field("EN_ACK_PAY",   rx[1], 1, 1, 0);
+    print_field("EN_DYN_ACK",   rx[1], 0, 1, 0);
 }

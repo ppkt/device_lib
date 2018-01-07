@@ -8,6 +8,7 @@
 
 #include "common_lib/spi.h"
 #include "common_lib/utils.h"
+#include "common_lib/usart.h"
 
 // Commands
 #define R_REGISTER      0x00
@@ -66,9 +67,22 @@ typedef struct {
     uint8_t device_id;
 } nrf24l01_context;
 
+typedef union {
+    uint8_t data;
+
+    struct {
+        uint8_t tx_full: 1;
+        uint8_t rx_p_no: 3;
+        uint8_t max_rt: 1;
+        uint8_t tx_ds: 1;
+        uint8_t rx_dr: 1;
+        uint8_t _reserved: 1;
+    } reg;
+} nrf24l01_status_reg;
+
 nrf24l01_context* nrf24l01_init(uint8_t device_id, SPI_TypeDef *spi,
                                 TIM_TypeDef *timer, nrf24l01_role role);
-uint8_t nrf24l01_status(nrf24l01_context *ctx);
+nrf24l01_status_reg nrf24l01_status(nrf24l01_context *ctx);
 void nrf24l01_reset(nrf24l01_context *ctx);
 
 void nrf24l01_flush_tx(nrf24l01_context *ctx);
@@ -97,7 +111,9 @@ void nrf24l01_set_rx_address(nrf24l01_context *ctx,
 
 void nrf24l01_activate_dynamic_payload(nrf24l01_context *ctx);
 void nrf24l01_enable_dynamic_payload(nrf24l01_context *ctx, uint8_t pipe);
-uint8_t *nrf24l01_receive_payload_dynamic(nrf24l01_context *ctx);
+uint8_t *nrf24l01_receive_payload_dynamic(nrf24l01_context *ctx,
+                                          uint8_t *length);
+void nrf24l01_print_register_map(nrf24l01_context *ctx);
 // Low level API
 //void nrf24l01_ce(nrf24l01_context ctx, bool new_state);
 
