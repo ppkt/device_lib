@@ -100,12 +100,16 @@ nrf24l01_context* nrf24l01_init(uint8_t device_id, SPI_TypeDef *spi,
     nrf24l01_write_register(ctx, CONFIG, init_buffer, 1);
 
     // Setup Auto-Ack on pipe 0
-    init_buffer[0] = 0x0F; // enable AA
+    init_buffer[0] = 0b00111111; // enable AA
 //    init_buffer[0] = 0x00; // disable AA
     nrf24l01_write_register(ctx, EN_AA, init_buffer, 1);
 
+    // Enable RX pipe 0 and 1 (default)
+    init_buffer[0] = 0b11;
+    nrf24l01_write_register(ctx, EN_RXADDR, init_buffer, 1);
+
     // Address Widths - 5 bytes RF address
-    init_buffer[0] = 0x03;
+    init_buffer[0] = 0b00000011;
     nrf24l01_write_register(ctx, SETUP_AW, init_buffer, 1);
 
     nrf24l01_setup_automatic_retransmission(ctx, 4000, 15);
@@ -279,7 +283,11 @@ void nrf24l01_set_rx_address(nrf24l01_context *ctx,
         pipe = 5;
     }
 
-    uint8_t buffer[1] = {1 << pipe};
+    // Read register and enable pipe
+    uint8_t buffer[2];
+    nrf24l01_read_register(ctx, EN_RXADDR, buffer, 1);
+
+    buffer[0] = buffer[1] | 1 << pipe;
     // Enable RX address on selected pipe
     nrf24l01_write_register(ctx, EN_RXADDR, buffer, 1);
 
@@ -347,9 +355,11 @@ void nrf24l01_enable_dynamic_payload(nrf24l01_context *ctx, uint8_t pipe) {
 void print_field(char* name, uint8_t reg, uint8_t pos, uint8_t length,
                  uint8_t def) {
 
+    uint8_t length_mask = 0xff >> (8 - length);
+
     if (length > 0) {
         usart_printf(USART1, "\t%-11.11s\t%i\t%i\r\n",
-                     name, (reg >> pos) & length, def);
+                     name, (reg >> pos) & length_mask, def);
     } else {
         usart_printf(USART1, "\t%-11.11s\t- \t- \r\n", name);
     }
@@ -428,22 +438,29 @@ void nrf24l01_print_register_map(nrf24l01_context *ctx) {
     print_field("ARC_CNT",      rx[1], 0, 4, 0);
 
     nrf24l01_read_register(ctx, RX_ADDR_P0, rx, 5);
-    usart_printf(USART1, "[RX_ADDR_P0] 0x%02x%02x%02x%02x%02x\r\n",
+    usart_printf(USART1, "[RX_ADDR_P0] 0x%02x%02x%02x%02x%02x\t%c%c%c%c%c\r\n",
+                 rx[1], rx[2], rx[3], rx[4], rx[5],
                  rx[1], rx[2], rx[3], rx[4], rx[5]);
     nrf24l01_read_register(ctx, RX_ADDR_P1, rx, 5);
-    usart_printf(USART1, "[RX_ADDR_P1] 0x%02x%02x%02x%02x%02x\r\n",
+    usart_printf(USART1, "[RX_ADDR_P1] 0x%02x%02x%02x%02x%02x\t%c%c%c%c%c\r\n",
+                 rx[1], rx[2], rx[3], rx[4], rx[5],
                  rx[1], rx[2], rx[3], rx[4], rx[5]);
     nrf24l01_read_register(ctx, RX_ADDR_P2, rx, 1);
-    usart_printf(USART1, "[RX_ADDR_P2]           %02x\r\n", rx[1]);
+    usart_printf(USART1, "[RX_ADDR_P2]           %02x\t    %c\r\n",
+                 rx[1], rx[1]);
     nrf24l01_read_register(ctx, RX_ADDR_P3, rx, 1);
-    usart_printf(USART1, "[RX_ADDR_P3]           %02x\r\n", rx[1]);
+    usart_printf(USART1, "[RX_ADDR_P3]           %02x\t    %c\r\n",
+                 rx[1], rx[1]);
     nrf24l01_read_register(ctx, RX_ADDR_P4, rx, 1);
-    usart_printf(USART1, "[RX_ADDR_P4]           %02x\r\n", rx[1]);
+    usart_printf(USART1, "[RX_ADDR_P4]           %02x\t    %c\r\n",
+                 rx[1], rx[1]);
     nrf24l01_read_register(ctx, RX_ADDR_P5, rx, 1);
-    usart_printf(USART1, "[RX_ADDR_P5]           %02x\r\n", rx[1]);
+    usart_printf(USART1, "[RX_ADDR_P5]           %02x\t    %c\r\n",
+                 rx[1], rx[1]);
 
     nrf24l01_read_register(ctx, TX_ADDR, rx, 5);
-    usart_printf(USART1, "[TX_ADDR] 0x%02x%02x%02x%02x%02x\r\n",
+    usart_printf(USART1, "[TX_ADDR]    0x%02x%02x%02x%02x%02x\t%c%c%c%c%c\r\n",
+                 rx[1], rx[2], rx[3], rx[4], rx[5],
                  rx[1], rx[2], rx[3], rx[4], rx[5]);
 
     nrf24l01_read_register(ctx, RX_PW_P0, rx, 1);
