@@ -300,16 +300,16 @@ void nrf24l01_set_rx_address(nrf24l01_context *ctx,
             nrf24l01_write_register(ctx, RX_ADDR_P1, new_address, 5);
             break;
         case 2:
-            nrf24l01_write_register(ctx, RX_ADDR_P2, new_address, 5);
+            nrf24l01_write_register(ctx, RX_ADDR_P2, new_address, 1);
             break;
         case 3:
-            nrf24l01_write_register(ctx, RX_ADDR_P3, new_address, 5);
+            nrf24l01_write_register(ctx, RX_ADDR_P3, new_address, 1);
             break;
         case 4:
-            nrf24l01_write_register(ctx, RX_ADDR_P4, new_address, 5);
+            nrf24l01_write_register(ctx, RX_ADDR_P4, new_address, 1);
             break;
         case 5:
-            nrf24l01_write_register(ctx, RX_ADDR_P5, new_address, 5);
+            nrf24l01_write_register(ctx, RX_ADDR_P5, new_address, 1);
             break;
     }
 }
@@ -347,7 +347,11 @@ void nrf24l01_enable_dynamic_payload(nrf24l01_context *ctx, uint8_t pipe) {
     if (pipe > 5)
         pipe = 5;
 
-    uint8_t buffer[] = {1 << pipe};
+    // Read register and enable pipe
+    uint8_t buffer[2];
+    nrf24l01_read_register(ctx, DYNPD, buffer, 1);
+
+    buffer[0] = buffer[1] | 1 << pipe;
     nrf24l01_write_register(ctx, DYNPD, buffer, 1);
 
 }
@@ -436,6 +440,10 @@ void nrf24l01_print_register_map(nrf24l01_context *ctx) {
     usart_printf(USART1, "[OBSERVE_TX] 0x%02x\r\n", rx[1]);
     print_field("PLOS_CNT",     rx[1], 3, 4, 0);
     print_field("ARC_CNT",      rx[1], 0, 4, 0);
+
+    nrf24l01_read_register(ctx, RPD, rx, 1);
+    usart_printf(USART1, "[RPD] 0x%02x\r\n", rx[1]);
+    print_field("RPD",          rx[1], 0, 1, 0);
 
     nrf24l01_read_register(ctx, RX_ADDR_P0, rx, 5);
     usart_printf(USART1, "[RX_ADDR_P0] 0x%02x%02x%02x%02x%02x\t%c%c%c%c%c\r\n",
