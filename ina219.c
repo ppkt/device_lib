@@ -1,156 +1,128 @@
 #include "ina219.h"
 
-static uint8_t rx[3];
 
-void ina219_initial_configuration(void) {
+uint8_t ina219_read_register(ina219_device *device,
+                             ina219_register address,
+                             uint16_t *value)
+{
+    static uint8_t tx[1] = {0, }, rx[2];
+
+    tx[0] = address;
+    Status s = i2c_master_transaction_write_read(device->i2c, tx, 1, rx, 2,
+                                                 DMA, device->address);
+    *value = rx[0] << 8 | rx[1];
+    return s == Error;
+}
+
+uint8_t ina219_write_register(ina219_device *device,
+                              ina219_register address,
+                              uint16_t new_value)
+{
+    static uint8_t tx[3] = {0, };
+
+    tx[0] = address;
+    tx[1] = new_value >> 8;
+    tx[2] = new_value & 0xFF;
+    Status s = I2C_Master_BufferWrite(device->i2c, tx, 3, DMA,
+                                      device->address << 1);
+
+    return s == Error;
+}
+
+uint8_t ina219_setup(ina219_device **dev,
+                     I2C_TypeDef *i2c,
+                     TIM_TypeDef *timer,
+                     uint8_t address)
+{
+    *dev = (ina219_device*) malloc(sizeof(ina219_device));
+    (*dev)->i2c = i2c;
+    (*dev)->timer = timer;
+    (*dev)->address = address;
+
+    return 0;
+}
+
+
+uint8_t ina219_init(ina219_device *device)
+{
+    I2C_LowLevel_Init(device->i2c);
+
+    ina219_config config;
+    ina219_read_register(device, ina219_register_configuration, &config.raw);
+
     // Check if device requires reset
-    rx[0] = 0x00;
-    I2C_Master_BufferWrite(I2C1, rx, 1, Polling, 0x40 << 1);
-    I2C_Master_BufferRead(I2C1, rx, 2, Polling, 0x40 << 1);
-
-    uint16_t configuration = rx[0] << 8 | rx[1];
-    if (configuration != 0x399F) {
-        printf("Restarting device\r\n");
-        rx[0] = 0x00;
-        rx[1] = 0x80;
-        rx[2] = 0x00;
-        I2C_Master_BufferWrite(I2C1, rx, 3, Polling, 0x40 << 1);
+    if (config.raw != 0x399F) {
+        usart1_print("Restarting device\r\n");
+        config.rst = 1;
+        ina219_write_register(device, ina219_register_configuration, config.raw);
 
         do {
             // Wait until device is ready
-            rx[0] = 0x00;
-            I2C_Master_BufferWrite(I2C1, rx, 1, Polling, 0x40 << 1);
-            I2C_Master_BufferRead(I2C1, rx, 2, Polling, 0x40 << 1);
-            configuration = rx[0] << 8 | rx[1];
-        } while (configuration != 0x399F);
+            ina219_read_register(device, ina219_register_configuration, &config.raw);
+        } while (config.raw != 0x399F);
     }
 
-    bool brng = true; // Bus Voltage Range - 32V
-    u8 pg = 0b11; // PGA gain and range - +8 / 320 mA
-    // Default settings:
-//    u8 badc = 0b0011; // Bus ADC Settings - 12bit samples / 532 us conversion time
-//    u8 sadc = 0b0011; // Shunt ADC Settings - 12bit samples / 532 us conversion time
+    config = (ina219_config) {
+        .brng = 0b1, // Bus Voltage Range - 32V
+        .pga = 0b11, // PGA gain and range - +8 / 320 mA
+        .badc = 0b1111, // Bus ADC Settings - 128x12bit samples / 68.1 ms conversion time
+        .sadc = 0b1111, // Shunt ADC Settings - 128x12bit samples / 68.1 ms conversion time
+        .mode = 0b111, // Mode - Shunt and Bus, Continuous
+    };
+    usart1_printf("New configuration: %X\r\n", config.raw);
 
-    u8 badc = 0b1111; // Bus ADC Settings - 128x12bit samples / 68.1 ms conversion time
-    u8 sadc = 0b1111; // Shunt ADC Settings - 128x12bit samples / 68.1 ms conversion time
+    ina219_write_register(device, ina219_register_configuration, config.raw);
 
-    u8 mode = 0b111; // Mode - Shunt and Bus, Continous
-
-    configuration = brng << 13 | pg << 11 | badc << 7 | sadc << 3 | mode;
-    printf("New configuration: %X\r\n", configuration);
-    rx[0] = 0x00;
-    rx[1] = configuration >> 8;
-    rx[2] = 0x00FF & configuration;
-    I2C_Master_BufferWrite(I2C1, rx, 3, Polling, 0x40 << 1);
-
+    return 0;
 }
 
-void ina219_setup(void) {
-    I2C_LowLevel_Init(I2C1);
-
-    ina219_initial_configuration();
+uint8_t ina219_perform_calibration(ina219_device *device)
+{
+    return ina219_write_register(device, ina219_register_calibration,
+                                 device->calibration_register);
 }
 
-uint16_t ina219_perform_calibration(void) {
-    // Write new values (calculated from INA219 datasheet) of calibration
-    // register
-    //
-    // WARNING: All calculations (except measuring voltage on bus and shunt
-    // resistor - 0.1 ohm in this case) are based on "PROGRAMMING THE INA219
-    // POWER MEASUREMENT ENGINE" chapter of INA219 datasheet
-    rx[0] = 0x05;
-    rx[1] = 0x40;
-    rx[2] = 0x00;
-
-    I2C_Master_BufferWrite(I2C1, rx, 3, Polling, 0x40 << 1);
-
-    return (rx[1] << 8) | rx[2];
-}
-
-uint16_t ina219_read_bus_voltage(void) {
-    // Read and print bus voltage
-
-    rx[0] = 0x02;
-    I2C_Master_BufferWrite(I2C1, rx, 1, Polling, 0x40 << 1);
-    I2C_Master_BufferRead(I2C1, rx, 2, Polling, 0x40 << 1);
+void ina219_get_bus_voltage(ina219_device *device) {
+    // Read bus voltage
+    uint16_t val;
+    ina219_read_register(device, ina219_register_bus_voltage, &val);
 
     // TODO: Check and handle overflows
-    uint16_t value = (rx[0] << 8 | rx[1]) >> 3;
+    device->raw_bus_voltage = val >> 3;
 
-    return value;
+
+    // 1 LSB = 4mV (value from datasheet)
+    device->bus_voltage = device->raw_bus_voltage * 4 / 1000.0;
 }
 
-void ina219_print_bus_voltage(void) {
-    int16_t voltage = ina219_read_bus_voltage();
-
-    voltage *= 4; // 1 LSB = 4mV (value from datasheet)
-
-    uint8_t v = voltage / 1000;
-    printf("Bus voltage: %d.%03d V\r\n", v, abs(voltage - (v * 1000)));
-
-}
-
-int16_t ina219_read_shunt_voltage(void) {
+void ina219_get_shunt_voltage(ina219_device *device) {
     // Read drop of voltage across shunt
+    ina219_read_register(device, ina219_register_shunt_voltage,
+                         (uint16_t *) &device->raw_shunt_voltage);
 
-    rx[0] = 0x01;
-    I2C_Master_BufferWrite(I2C1, rx, 1, Polling, 0x40 << 1);
-    I2C_Master_BufferRead(I2C1, rx, 2, Polling, 0x40 << 1);
-
-    int16_t value = (rx[0] << 8 | rx[1]);
-
-    return value;
+    device->shunt_voltage = device->raw_shunt_voltage / 1000.0;
 }
 
-void ina219_print_shunt_voltage(void) {
-    int16_t voltage = ina219_read_shunt_voltage();
+void ina219_get_current(ina219_device *device) {
+    ina219_read_register(device, ina219_register_current,
+                         (uint16_t *) &device->raw_current);
 
-    int8_t v = voltage / 1000; // 1 LSB = 10uV (value from datasheet)
-
-    printf("Shunt voltage: %d.%03d mV\r\n", v, abs(voltage - (v * 1000)));
+    // 1 LSB = 0.1 mA (calculated value)
+    device->current = device->raw_current * 0.1;
 }
 
-uint16_t ina219_read_current(void) {
-    // Based on shunt voltage drop and value of calibration register
-    // calculates current
+void ina219_get_power(ina219_device *device) {
+    ina219_read_register(device, ina219_register_power,
+                         (uint16_t *) &device->raw_power);
 
-    // Read calibration register
-    rx[0] = 0x05;
-    I2C_Master_BufferWrite(I2C1, rx, 1, Polling, 0x40 << 1);
-    I2C_Master_BufferRead(I2C1, rx, 2, Polling, 0x40 << 1);
-
-    uint16_t calibration_register = (rx[0] << 8 | rx[1]);
-
-    int16_t shunt_voltage = ina219_read_shunt_voltage();
-
-    uint32_t current = (shunt_voltage * calibration_register) / 4096;
-
-    return current;
+    // 1 LSB = 2 mW (calculated value) = 20 * Current LSB
+    device->power = device->raw_power * 2;
 }
 
-void ina219_print_current(void) {
-    uint16_t current = ina219_read_current();
-
-    float m_ampers = current * 0.025; // 1 LSB = 0.025 mA (calculated value)
-
-    printf("Current: %d mA\r\n", (uint8_t)m_ampers);
+void ina219_get_all_readings(ina219_device *device) {
+    ina219_get_bus_voltage(device);
+    ina219_get_shunt_voltage(device);
+    ina219_get_current(device);
+    ina219_get_power(device);
 }
 
-uint16_t ina219_get_power(void) {
-    // Read power register (current * drop voltage / 5000)
-
-    rx[0] = 0x03;
-    I2C_Master_BufferWrite(I2C1, rx, 1, Polling, 0x40 << 1);
-    I2C_Master_BufferRead(I2C1, rx, 2, Polling, 0x40 << 1);
-    uint16_t power = (rx[0] << 8 | rx[1]);
-
-    return power;
-}
-
-void ina219_print_power(void) {
-    uint16_t power = ina219_get_power();
-
-    power /= 2; // 1 LSB = 0.5 mW (calculated value) = 20 * Current LSB
-
-    printf("Power: %u mW\r\n", power);
-}

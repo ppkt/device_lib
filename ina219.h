@@ -1,5 +1,4 @@
-#ifndef __INA291_H__
-#define __INA291_H__
+#pragma once
 
 #include "math.h"
 #include "stdbool.h"
@@ -9,17 +8,58 @@
 #include "stm32f10x.h"
 
 #include "common_lib/i2c_dma.h"
+#include "common_lib/usart.h"
 
-void ina219_setup(void);
-uint16_t ina219_perform_calibration(void);
-uint16_t ina219_read_bus_voltage(void);
-int16_t ina219_read_shunt_voltage(void);
-uint16_t ina219_read_current(void);
-uint16_t ina219_get_power(void);
+typedef struct {
+    I2C_TypeDef* i2c;
+    TIM_TypeDef* timer;
+    uint8_t address;
 
-void ina219_print_bus_voltage(void);
-void ina219_print_shunt_voltage(void);
-void ina219_print_current(void);
-void ina219_print_power(void);
+    uint16_t calibration_register;
+    // raw values
+    int16_t raw_bus_voltage;
+    int16_t raw_shunt_voltage;
+    int16_t raw_current;
+    int16_t raw_power;
+    // converted values
+    double bus_voltage;
+    double shunt_voltage;
+    double current;
+    double power;
+} ina219_device;
 
-#endif // __INA291_H__
+
+typedef enum {
+    ina219_register_configuration = 0x00,
+    ina219_register_shunt_voltage,
+    ina219_register_bus_voltage,
+    ina219_register_power,
+    ina219_register_current,
+    ina219_register_calibration,
+} ina219_register;
+
+typedef struct {
+    union {
+        uint16_t raw;
+        struct __attribute__((packed)) {
+            uint8_t mode:3;
+            uint8_t sadc:4;
+            uint8_t badc:4;
+            uint8_t pga:2;
+            uint8_t brng:1;
+            uint8_t _:1;
+            uint8_t rst:1;
+        };
+    };
+} ina219_config;
+
+uint8_t ina219_setup(ina219_device **dev, I2C_TypeDef *i2c, TIM_TypeDef *timer,
+                     uint8_t address);
+uint8_t ina219_init(ina219_device* device);
+uint8_t ina219_perform_calibration(ina219_device *device);
+
+void ina219_get_bus_voltage(ina219_device *device);
+void ina219_get_shunt_voltage(ina219_device *device);
+void ina219_get_current(ina219_device *device);
+void ina219_get_power(ina219_device *device);
+void ina219_get_all_readings(ina219_device *device);
