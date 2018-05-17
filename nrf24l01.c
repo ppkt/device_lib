@@ -9,6 +9,8 @@ void nrf24l01_deselect_device(nrf24l01_context *ctx) {
         GPIO_WriteBit(GPIOA, GPIO_Pin_4, Bit_SET);
     } else if (ctx->device_id == 1) {
         GPIO_WriteBit(GPIOA, GPIO_Pin_0, Bit_SET);
+    } else if (ctx->device_id == 2) {
+        GPIO_WriteBit(GPIOB, GPIO_Pin_2, Bit_SET);
     }
 }
 
@@ -20,22 +22,21 @@ void nrf24l01_select_device(nrf24l01_context *ctx) {
         GPIO_WriteBit(GPIOA, GPIO_Pin_4, Bit_RESET);
     } else if (ctx->device_id == 1) {
         GPIO_WriteBit(GPIOA, GPIO_Pin_0, Bit_RESET);
+    } else if (ctx->device_id == 2) {
+        GPIO_WriteBit(GPIOB, GPIO_Pin_2, Bit_RESET);
     }
 }
 
 void nrf24l01_ce(nrf24l01_context *ctx, bool new_state) {
+    BitAction b = new_state ? Bit_SET : Bit_RESET;
+
+
     if (ctx->device_id == 0) {
-        if (new_state) {
-            GPIO_WriteBit(GPIOA, GPIO_Pin_8, Bit_SET);
-        } else {
-            GPIO_WriteBit(GPIOA, GPIO_Pin_8, Bit_RESET);
-        }
+        GPIO_WriteBit(GPIOA, GPIO_Pin_8, b);
     } else if (ctx->device_id == 1) {
-        if (new_state) {
-            GPIO_WriteBit(GPIOA, GPIO_Pin_2, Bit_SET);
-        } else {
-            GPIO_WriteBit(GPIOA, GPIO_Pin_2, Bit_RESET);
-        }
+        GPIO_WriteBit(GPIOA, GPIO_Pin_2, b);
+    } else if (ctx->device_id == 2) {
+        GPIO_WriteBit(GPIOB, GPIO_Pin_0, b);
     }
 }
 
@@ -44,6 +45,7 @@ void nrf24l01_gpio_init(nrf24l01_context *ctx) {
 
     // Configure NRF24 pins
     if (ctx->device_id == 0) {
+        RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
         // CE
         GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8;
         GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
@@ -61,6 +63,7 @@ void nrf24l01_gpio_init(nrf24l01_context *ctx) {
 //        GPIO_Init(GPIOA, &GPIO_InitStructure);
 
     } else if (ctx->device_id == 1) {
+        RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
         // CE
         GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2;
         GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
@@ -71,6 +74,20 @@ void nrf24l01_gpio_init(nrf24l01_context *ctx) {
         // Soft NSS
         GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
         GPIO_Init(GPIOA, &GPIO_InitStructure);
+    } else if (ctx->device_id == 2) {
+        RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+        // CE
+        GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2;
+        GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
+        GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+        GPIO_Init(GPIOB, &GPIO_InitStructure);
+        GPIO_WriteBit(GPIOB, GPIO_Pin_2, Bit_RESET);
+
+        // Soft NSS
+        GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
+        GPIO_Init(GPIOB, &GPIO_InitStructure);
+        GPIO_WriteBit(GPIOB, GPIO_Pin_0, Bit_RESET);
+
     }
 
     nrf24l01_deselect_device(ctx);
