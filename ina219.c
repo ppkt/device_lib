@@ -8,8 +8,8 @@ uint8_t ina219_read_register(ina219_device *device,
     static uint8_t tx[1] = {0, }, rx[2];
 
     tx[0] = address;
-    Status s = i2c_master_transaction_write_read(device->i2c, tx, 1, rx, 2,
-                                                 DMA, device->address);
+    Status s = i2c_master_transaction_write_read(device->i2c, device->address,
+                                                 tx, 1, rx, 2, DMA);
     *value = rx[0] << 8 | rx[1];
     return s == Error;
 }
