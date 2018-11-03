@@ -2,7 +2,7 @@
 
 static uint32_t zero = 0;
 static TIM_TypeDef *timer;
-double gram = 151962.0;
+float gram = 151962.0f;
 
 void hx711_gpio_init() {
     /* Enable GPIO clock */
@@ -30,14 +30,14 @@ void hx711_init(TIM_TypeDef *t) {
 
     // dummy read to set gain
     hx711_single_read();
-    delay_ms(timer, 100);
+    delay_ms(timer, 1000);
 
     zero = hx711_avg_read(16);
 }
 
 int32_t hx711_single_read(void) {
     uint8_t i;
-    int32_t reading;
+    int32_t reading = 0;
 
     for (i = 0; i < 27; ++i) {
         GPIO_WriteBit(GPIOA, GPIO_Pin_11, 1);
@@ -64,8 +64,8 @@ int32_t hx711_avg_read(uint8_t samples) {
     return adc_data;
 }
 
-int32_t hx711_read_gram(void) {
+float hx711_read_gram(void) {
     int32_t read = hx711_avg_read(8);
 
-    return (int32_t)((read / gram) * pow(10, 3));
+    return (float)read / gram;
 }
