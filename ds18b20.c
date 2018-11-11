@@ -1,34 +1,26 @@
 #include "ds18b20.h"
 
-static uint8_t precission = 3;
-static one_wire_device *one_wire_list_of_devices;
-static uint8_t one_wire_devices_list_size = 10;
+static uint8_t precision = 3;
 static TIM_TypeDef *timer;
 
-void ds18b20_init(GPIO_TypeDef *gpio, uint16_t port, TIM_TypeDef *t) {
+// Initialize library and return 1-Wire devices
+ds18b20_devices ds18b20_init(GPIO_TypeDef *gpio, uint16_t port, TIM_TypeDef *t) {
     timer = t;
     one_wire_init(gpio, port, t);
 
-    ds18b20_get_devices(true);
-}
-
-uint8_t ds18b20_get_precission(void) {
-    return precission;
-}
-
-ds18b20_devices ds18b20_get_devices(bool scan) {
-    if (scan) {
-        one_wire_devices_list_size = 0;
-        one_wire_list_of_devices = one_wire_search_rom(&one_wire_devices_list_size);
-    }
     ds18b20_devices ret;
-    ret.size = one_wire_devices_list_size;
-    ret.devices = one_wire_list_of_devices;
+    ret.devices = one_wire_search_rom(&ret.size);
     return ret;
 }
 
-void ds18b20_set_precission(uint8_t p) {
-    precission = p;
+// Return precision
+uint8_t ds18b20_get_precision(void) {
+    return precision;
+}
+
+// Set new precision (0-3, 0-lowest, 3-highest)
+void ds18b20_set_precision(uint8_t p) {
+    precision = p;
     one_wire_reset_pulse();
 
     one_wire_write_byte(0xCC); // Skip ROM
@@ -36,30 +28,36 @@ void ds18b20_set_precission(uint8_t p) {
 
     one_wire_write_byte(0x4B);
     one_wire_write_byte(0x46);
-    // set precission
-    one_wire_write_byte(0x1F | (precission << 5));
+    // set precision
+    one_wire_write_byte((uint8_t) 0x1F | (precision << 5));
 }
 
+// Send command to device to convert temperature
+// (use only if there is one device connected)
 void ds18b20_convert_temperature_simple(void) {
     one_wire_reset_pulse();
     one_wire_write_byte(0xCC); // Skip ROM
     one_wire_write_byte(0x44); // Convert temperature
 }
 
+// Send command to device to convert temperature
 void ds18b20_convert_temperature(one_wire_device device) {
     one_wire_reset_pulse();
     one_wire_match_rom(device); // Match ROM
     one_wire_write_byte(0x44); // Convert temperature
 }
 
-void ds18b20_convert_temperature_all(void) {
+// Send command to convert temperature to every device in list
+void ds18b20_convert_temperature_all(ds18b20_devices devices) {
     uint8_t i = 0;
-    for (i = 0; i < one_wire_devices_list_size; ++i) {
-        ds18b20_convert_temperature(one_wire_list_of_devices[i]);
+    for (i = 0; i < devices.size; ++i) {
+        ds18b20_convert_temperature(devices.devices[i]);
     }
 }
 
-simple_float ds18b20_read_temperature_simple(void) {
+// Read converted temperature from device
+// (use only if there is one device connected)
+float ds18b20_read_temperature_simple(void) {
     one_wire_reset_pulse();
     one_wire_write_byte(0xCC); // Skip ROM
     one_wire_write_byte(0xBE); // Read scratchpad
@@ -67,7 +65,8 @@ simple_float ds18b20_read_temperature_simple(void) {
     return ds18b20_decode_temperature();
 }
 
-simple_float ds18b20_read_temperature(one_wire_device device) {
+// Read converted temperature from device
+float ds18b20_read_temperature(one_wire_device device) {
     one_wire_reset_pulse();
     one_wire_match_rom(device); // Match ROM
     one_wire_write_byte(0xBE); // Read scratchpad
@@ -75,26 +74,26 @@ simple_float ds18b20_read_temperature(one_wire_device device) {
     return ds18b20_decode_temperature();
 }
 
-simple_float* ds18b20_read_temperature_all(void) {
+// Read converted temperature from every device in list
+float *ds18b20_read_temperature_all(ds18b20_devices devices) {
     uint8_t i = 0;
-    simple_float *temperatures;
-    temperatures = malloc(one_wire_devices_list_size * sizeof(simple_float));
+    float *temperatures;
+    temperatures = malloc(devices.size * sizeof(float));
 
-    for (i = 0; i < one_wire_devices_list_size; ++i) {
-        temperatures[i] = ds18b20_read_temperature(one_wire_list_of_devices[i]);
+    for (i = 0; i < devices.size; ++i) {
+        temperatures[i] = ds18b20_read_temperature(devices.devices[i]);
     }
     return temperatures;
 }
 
-simple_float ds18b20_decode_temperature(void) {
-    int i;
-    uint8_t crc;
+// Decode temperature send from device. Use CRC to ensure that reading is
+// correct. In case of CRC error a value -255 is returned.
+float ds18b20_decode_temperature() {
+    uint8_t crc = 0;
     uint8_t data[9];
-    simple_float f;
-    f.is_valid = false;
     one_wire_reset_crc();
 
-    for (i = 0; i < 9; ++i) {
+    for (uint8_t i = 0; i < 9; ++i) {
         data[i] = one_wire_read_byte();
         crc = one_wire_crc(data[i]);
     }
@@ -103,37 +102,47 @@ simple_float ds18b20_decode_temperature(void) {
     uint8_t temp_lsb = data[0]; // Temp data plus lsb
 
     if (crc != 0 || (!crc && !temp_msb && !temp_lsb)) {
-        return f;
+        return -255.0f;
     }
-
-    float temp = (int16_t)(temp_msb << 8 | temp_lsb) / 16.0;
-    int rest = (temp - (int)temp) * 1000.0;
-
-    f.integer = (int8_t)temp;
-    f.fractional = abs(rest);
-    f.is_valid = true;
 
 //    char buffer[10];
 //    sprintf(buffer, "%d.%d\r", (int)temp, rest);
 //    usart2_print(buffer);
-    return f;
+
+    return (int16_t) (temp_msb << 8 | temp_lsb) / 16.0f;
 }
 
+// Wait for temperature conversion depending on precision set
 void ds18b20_wait_for_conversion(void) {
-    if (precission == 0) {
+    if (precision == 0) {
         delay_ms(timer, 95);
-    } else if (precission == 1) {
+    } else if (precision == 1) {
         delay_ms(timer, 190);
-    } else if (precission == 2) {
+    } else if (precision == 2) {
         delay_ms(timer, 380);
-    } else if (precission == 3) {
+    } else if (precision == 3) {
         delay_ms(timer, 750);
     }
 }
 
-
-simple_float ds18b20_get_temperature_simple(void) {
+// Read temperature from device. This function performs all operations in once:
+// 1. Send command to device to convert temperature
+// 2. Wait until conversion is done
+// 3. Read and decode temperature
+// (use only if there is one device connected)
+float ds18b20_get_temperature_simple(void) {
     ds18b20_convert_temperature_simple();  // we have only one device
     ds18b20_wait_for_conversion();
     return ds18b20_read_temperature_simple();
+}
+
+// Read temperature from all devices in list.
+// This function performs all operations in once:
+// 1. Send command to devices to convert temperature
+// 2. Wait until conversion is done
+// 3. Read and decode temperature from every device
+float *ds18b20_get_temperature_all(ds18b20_devices devices) {
+    ds18b20_convert_temperature_all(devices);
+    ds18b20_wait_for_conversion();
+    return ds18b20_read_temperature_all(devices);
 }
