@@ -70,7 +70,7 @@ typedef struct {
 typedef union {
     uint8_t data;
 
-    struct {
+    struct __attribute__((packed)) {
         uint8_t tx_full: 1;
         uint8_t rx_p_no: 3;
         uint8_t max_rt: 1;
@@ -80,8 +80,44 @@ typedef union {
     } reg;
 } nrf24l01_status_reg;
 
-nrf24l01_context* nrf24l01_init(uint8_t device_id, SPI_TypeDef *spi,
-                                TIM_TypeDef *timer, nrf24l01_role role);
+union {
+    uint8_t raw;
+    struct __attribute__((packed)) {
+        uint8_t en_dyn_ack:1;  // dynamic acknowledgement
+        uint8_t en_ack_pay:1;  // payload with ack
+        uint8_t en_dpl:1; // dynamic payload length
+        uint8_t _:5;
+    };
+} nrf24l01_feature;
+
+union {
+    uint8_t raw;
+    struct __attribute__((packed)) {
+        uint8_t obsolete:1;
+        uint8_t rf_pwr:2;
+        uint8_t rf_dr_high:1;
+        uint8_t pll_lock:1;
+        uint8_t rf_dr_low:1;
+        uint8_t _:1;
+        uint8_t cont_wave:1;
+    };
+} nrf24l01_rf_setup;
+
+typedef struct {
+    uint8_t channel;
+    uint8_t address[5];
+
+    // Enable dynamic payload or set payload length
+    uint8_t dynamic_payload:1;
+    uint8_t payload_length;
+
+    // valid values are described in register RF_DR_HIGH in datasheet
+    uint8_t speed:2;
+} nrf24l01_config;
+
+nrf24l01_context *
+nrf24l01_init(uint8_t device_id, SPI_TypeDef *spi, TIM_TypeDef *timer, nrf24l01_role role,
+              nrf24l01_config *config);
 nrf24l01_status_reg nrf24l01_status(nrf24l01_context *ctx);
 void nrf24l01_reset(nrf24l01_context *ctx);
 
@@ -98,7 +134,7 @@ uint8_t nrf24l01_send_command_multiple(nrf24l01_context *ctx, uint8_t command,
                                        uint8_t *data, uint8_t bytes);
 
 void nrf24l01_send_payload(nrf24l01_context *ctx, uint8_t *data, uint8_t bytes);
-uint8_t nrf24l01_receive_payload(nrf24l01_context *ctx, uint8_t bytes);
+uint8_t* nrf24l01_receive_payload_static(nrf24l01_context *ctx, uint8_t bytes);
 
 void nrf24l01_listen(nrf24l01_context *ctx, bool status);
 
@@ -111,6 +147,9 @@ void nrf24l01_set_rx_address(nrf24l01_context *ctx,
 
 void nrf24l01_activate_dynamic_payload(nrf24l01_context *ctx);
 void nrf24l01_enable_dynamic_payload(nrf24l01_context *ctx, uint8_t pipe);
+
+void nrf24l01_disable_dynamic_payload(nrf24l01_context *ctx);
+
 uint8_t *nrf24l01_receive_payload_dynamic(nrf24l01_context *ctx,
                                           uint8_t *length);
 void nrf24l01_print_register_map(nrf24l01_context *ctx);
