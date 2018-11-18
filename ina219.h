@@ -22,10 +22,10 @@ typedef struct {
     int16_t raw_current;
     int16_t raw_power;
     // converted values
-    double bus_voltage;
-    double shunt_voltage;
-    double current;
-    double power;
+    float bus_voltage;
+    float shunt_voltage;
+    float current;
+    float power;
 } ina219_device;
 
 

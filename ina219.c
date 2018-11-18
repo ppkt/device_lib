@@ -92,7 +92,7 @@ void ina219_get_bus_voltage(ina219_device *device) {
 
 
     // 1 LSB = 4mV (value from datasheet)
-    device->bus_voltage = device->raw_bus_voltage * 4 / 1000.0;
+    device->bus_voltage = device->raw_bus_voltage * 4 / 1000.0f;
 }
 
 void ina219_get_shunt_voltage(ina219_device *device) {
@@ -100,7 +100,7 @@ void ina219_get_shunt_voltage(ina219_device *device) {
     ina219_read_register(device, ina219_register_shunt_voltage,
                          (uint16_t *) &device->raw_shunt_voltage);
 
-    device->shunt_voltage = device->raw_shunt_voltage / 1000.0;
+    device->shunt_voltage = device->raw_shunt_voltage / 1000.0f;
 }
 
 void ina219_get_current(ina219_device *device) {
@@ -108,7 +108,7 @@ void ina219_get_current(ina219_device *device) {
                          (uint16_t *) &device->raw_current);
 
     // 1 LSB = 0.1 mA (calculated value)
-    device->current = device->raw_current * 0.1;
+    device->current = device->raw_current * 0.1f;
 }
 
 void ina219_get_power(ina219_device *device) {
