@@ -5,14 +5,11 @@
 #include "stdio.h"
 #include "stdlib.h"
 
-#include "stm32f10x.h"
-
-#include "common_lib/i2c_dma.h"
+#include "common_lib/i2c.h"
 #include "common_lib/usart.h"
 
 typedef struct {
-    I2C_TypeDef* i2c;
-    TIM_TypeDef* timer;
+    uint32_t i2c;
     uint8_t address;
 
     uint16_t calibration_register;
@@ -53,10 +50,9 @@ typedef struct {
     };
 } ina219_config;
 
-uint8_t ina219_setup(ina219_device **dev, I2C_TypeDef *i2c, TIM_TypeDef *timer,
-                     uint8_t address);
-uint8_t ina219_init(ina219_device* device);
-uint8_t ina219_perform_calibration(ina219_device *device);
+bool ina219_setup(ina219_device **dev, uint32_t i2c, uint8_t address);
+bool ina219_init(ina219_device* device);
+bool ina219_perform_calibration(ina219_device *device);
 
 void ina219_get_bus_voltage(ina219_device *device);
 void ina219_get_shunt_voltage(ina219_device *device);

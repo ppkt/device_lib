@@ -1,52 +1,52 @@
 #include "ina219.h"
 
+bool ina219_read_register(ina219_device *device,
+                          ina219_register address,
+                          uint16_t *value);
 
-uint8_t ina219_read_register(ina219_device *device,
-                             ina219_register address,
-                             uint16_t *value)
-{
-    static uint8_t tx[1] = {0, }, rx[2];
+bool ina219_write_register(ina219_device *device,
+                           ina219_register address,
+                           uint16_t new_value);
+
+bool ina219_read_register(ina219_device *device,
+                          ina219_register address,
+                          uint16_t *value) {
+    static uint8_t tx[1] = {0,}, rx[2];
 
     tx[0] = address;
-    Status s = i2c_master_transaction_write_read(device->i2c, device->address,
-                                                 tx, 1, rx, 2, DMA);
+    bool s = i2c_master_transaction_write_read(device->i2c, device->address,
+                                                 tx, 1, rx, 2);
     *value = rx[0] << 8 | rx[1];
-    return s == Error;
+    return s;
 }
 
-uint8_t ina219_write_register(ina219_device *device,
+bool ina219_write_register(ina219_device *device,
                               ina219_register address,
                               uint16_t new_value)
 {
     static uint8_t tx[3] = {0, };
 
     tx[0] = address;
-    tx[1] = new_value >> 8;
-    tx[2] = new_value & 0xFF;
-    Status s = I2C_Master_BufferWrite(device->i2c, tx, 3, DMA,
-                                      device->address << 1);
+    tx[1] = (uint8_t) (new_value >> 8);
+    tx[2] = (uint8_t) (new_value & 0xFF);
+    bool s = i2c_master_write(device->i2c, device->address, tx, 3);
 
-    return s == Error;
+    return s;
 }
 
-uint8_t ina219_setup(ina219_device **dev,
-                     I2C_TypeDef *i2c,
-                     TIM_TypeDef *timer,
-                     uint8_t address)
-{
-    *dev = (ina219_device*) malloc(sizeof(ina219_device));
+bool ina219_setup(ina219_device **dev,
+                  uint32_t i2c,
+                  uint8_t address) {
+    *dev = (ina219_device *) malloc(sizeof(ina219_device));
     (*dev)->i2c = i2c;
-    (*dev)->timer = timer;
     (*dev)->address = address;
 
-    return 0;
+    return false;
 }
 
 
-uint8_t ina219_init(ina219_device *device)
+bool ina219_init(ina219_device *device)
 {
-    I2C_LowLevel_Init(device->i2c);
-
     ina219_config config;
     ina219_read_register(device, ina219_register_configuration, &config.raw);
 
@@ -76,7 +76,7 @@ uint8_t ina219_init(ina219_device *device)
     return 0;
 }
 
-uint8_t ina219_perform_calibration(ina219_device *device)
+bool ina219_perform_calibration(ina219_device *device)
 {
     return ina219_write_register(device, ina219_register_calibration,
                                  device->calibration_register);
