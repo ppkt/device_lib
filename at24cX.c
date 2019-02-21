@@ -1,10 +1,10 @@
 #include "at24cX.h"
 
-inline uint8_t *get_tx_buffer(uint16_t address, uint8_t size);
+inline uint8_t *get_tx_buffer(uint16_t address, uint8_t extra_size);
 
 uint8_t *
-get_tx_buffer(uint16_t address, uint8_t size) {
-    uint8_t *tx = malloc((2 + size) * sizeof(uint8_t));
+get_tx_buffer(uint16_t address, uint8_t extra_size) {
+    uint8_t *tx = malloc((2 + extra_size) * sizeof(uint8_t));
     tx[0] = (uint8_t) (address >> 8);
     tx[1] = (uint8_t) (address & 0xFF);
     return tx;
@@ -31,9 +31,7 @@ at24cX_init(uint32_t i2c) {
 uint8_t *
 at24cX_random_read_bytes(const i2c_device *dev, uint16_t address,
                          uint16_t bytes) {
-    uint8_t *tx = malloc(2 * sizeof(uint8_t));
-    tx[0] = (uint8_t) (address >> 8);
-    tx[1] = (uint8_t) (address & 0xFF);
+    uint8_t *tx = get_tx_buffer(address, 0);
     uint8_t *rx = malloc(bytes * sizeof(uint8_t));
 
     i2c_master_transaction_write_read(dev->i2c, dev->address, tx, 2, rx, bytes);
@@ -66,9 +64,7 @@ at24cX_current_address_read_byte(const i2c_device *dev) {
 
 void
 at24cX_set_address(const i2c_device *dev, uint16_t address) {
-    uint8_t *tx = malloc(2 * sizeof(uint8_t));
-    tx[0] = (uint8_t) (address >> 8);
-    tx[1] = (uint8_t) (address & 0xFF);
+    uint8_t *tx = get_tx_buffer(address, 0);
 
     i2c_master_transaction_write_read(dev->i2c, dev->address, tx, 2, NULL, 0);
     free(tx);
