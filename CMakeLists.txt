@@ -2,6 +2,7 @@ add_library(device_lib STATIC
     at24cX.c
     ds1307.c
     ina219.c
+    max7219.c
     ssd1306.c
     )
 

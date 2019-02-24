@@ -1,10 +1,8 @@
-#ifndef __MAX7219_H__
-#define __MAX7219_H__
+#pragma once
 
 #include <stdlib.h>
 
-#include "common_lib/spi.h"
-
+#include <common_lib/spi.h>
 
 typedef enum {
     REG_CHANNEL0 = 0x01,
@@ -14,18 +12,56 @@ typedef enum {
     REG_TEST = 0x0F,
 } MAX7219_REGISTER;
 
-typedef struct {
-    SPI_TypeDef *spi;
-} max7219_device;
+/**
+ * Initialize module
+ */
+spi_device *
+max7219_init(uint32_t spi);
 
-max7219_device* max7219_init(SPI_TypeDef *spi);
-void max7219_reset(max7219_device* device);
-void max7219_self_test(max7219_device *device);
-void max7219_clear_display(max7219_device* device);
-void max7219_set_brightness(max7219_device* device, uint8_t new_value);
-void max7219_turn_all(max7219_device* device);
-void max7219_set_led(max7219_device* device, uint8_t row, uint8_t column);
-void max7219_reset_led(max7219_device* device, uint8_t row, uint8_t column);
-void max7219_set_data(max7219_device* device, uint8_t new_data[8]);
+/**
+ * Perform reset operation
+ */
+void
+max7219_reset(const spi_device *device);
 
-#endif // __MAX7219_H__
+/**
+ * Turn on and off all LEDs on board
+ */
+void
+max7219_self_test(const spi_device *device);
+
+/**
+ * Turn off all LEDs
+ */
+void
+max7219_clear_display(const spi_device *device);
+
+/**
+ * Turn on all LEDs
+ */
+void
+max7219_turn_all(const spi_device *device);
+
+/**
+ * Set new intensity (brightness) of LEDs
+ */
+void
+max7219_set_brightness(const spi_device *device, uint8_t new_value);
+
+/**
+ * Turn on single LED
+ */
+void
+max7219_set_led(const spi_device *device, uint8_t row, uint8_t column);
+
+/**
+ * Turn off single LED
+ */
+void
+max7219_reset_led(const spi_device *device, uint8_t row, uint8_t column);
+
+/**
+ * Draw whole 8x8 segment
+ */
+void
+max7219_set_data(const spi_device *device, uint8_t new_data[8]);
