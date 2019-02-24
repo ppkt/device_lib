@@ -15,21 +15,30 @@ ds1307_init(uint32_t i2c) {
 }
 
 struct tm
-ds1307_read_date(const i2c_device *dev) {
+ds1307_read_date_raw(const i2c_device *dev, bool convert_bcm_to_dec) {
+
+    uint8_t (*convert)(uint8_t) = &noop;
+    if (convert_bcm_to_dec) {
+        convert = &bcd_to_decimal;
+    }
+
     tx[0] = DS1307_SECONDS_REG;
     i2c_master_transaction_write_read(
             dev->i2c, dev->address, tx, 1, rx, 7);
     struct tm result;
-    result.tm_sec = bcd_to_decimal(rx[0]);
-    result.tm_min = bcd_to_decimal(rx[1]);
-    result.tm_hour = bcd_to_decimal(rx[2] & (uint8_t) 0x3F);
-    result.tm_mday = bcd_to_decimal(rx[4]);
+    result.tm_sec = convert(rx[0]);
+    result.tm_min = convert(rx[1]);
+    result.tm_hour = convert(rx[2] & (uint8_t) 0x3F);
+    result.tm_mday = convert(rx[4]);
     // Month is stored in device in range 1-12, tm is using 0-11
-    result.tm_mon = bcd_to_decimal(rx[5]) - 1;
+    result.tm_mon = convert(rx[5]) - 1;
     // Year in device is measured since 2000, tm is using years since 1900
-    result.tm_year = bcd_to_decimal(rx[6]) + 100;
-    // Fill rest of the struct
-    mktime(&result);
+    result.tm_year = convert(rx[6]) + 100;
+
+    // Fill rest of the struct only if struct has correct data
+    if (convert_bcm_to_dec) {
+        mktime(&result);
+    }
 
     return result;
 }

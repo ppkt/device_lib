@@ -46,16 +46,45 @@ decimal_to_bcd(uint8_t dec) {
 }
 
 /**
+ * Noop function used instead of `bcd_to_decimal` and `decimal_to_bcd`
+ */
+static inline uint8_t
+noop(uint8_t x) {
+    return x;
+}
+
+/**
  * Perform device initialization, check if device is connected to I2C bus
  */
 i2c_device *
 ds1307_init(uint32_t i2c);
 
 /**
- * Read date and time from device
+ * Read date and time from device, if `convert_bcm_to_dec` is set to true,
+ * perform conversion from Binary Coded Decimal to Decimal
  */
 struct tm
-ds1307_read_date(const i2c_device *dev);
+ds1307_read_date_raw(const i2c_device *dev, bool convert_bcm_to_dec);
+
+/**
+ * Read date and time from device
+ * @param dev
+ * @return
+ */
+static inline struct tm
+ds1307_read_date(const i2c_device *dev) {
+    return ds1307_read_date_raw(dev, true);
+};
+
+/**
+ * Read date and time from device in bcd format
+ * @param dev
+ * @return
+ */
+static inline struct tm
+ds1307_read_date_bcd(const i2c_device *dev) {
+    return ds1307_read_date_raw(dev, false);
+};
 
 /**
  * Set provided date and time to device
