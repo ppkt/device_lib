@@ -10,7 +10,7 @@ static uint8_t data[8];
 static void
 max7219_send(const spi_device *device, uint8_t address, uint8_t value) {
     uint8_t tx[] = {address, value};
-    spi_send_transaction(device->spi, tx, NULL, sizeof(tx) / sizeof(tx[0]));
+    spi_send_recv(device->spi, tx, NULL, sizeof(tx) / sizeof(tx[0]));
 }
 
 spi_device *
