@@ -1,5 +1,6 @@
 add_library(device_lib STATIC
     at24cX.c
+    ads1115.c
     ds1307.c
     ds3231.c
     ds_common.c
