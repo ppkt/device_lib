@@ -1,128 +1,183 @@
 #include "ina219.h"
 
-bool ina219_read_register(ina219_device *device,
-                          ina219_register address,
-                          uint16_t *value);
+static error_t ina219_read_register(const ina219_device *device,
+                                    ina219_register address, uint16_t *value) {
+  if (!device || !value) {
+    return E_NULL_PTR;
+  }
 
-bool ina219_write_register(ina219_device *device,
-                           ina219_register address,
-                           uint16_t new_value);
+  uint8_t tx[1] = {address}, rx[2];
 
-bool ina219_read_register(ina219_device *device,
-                          ina219_register address,
-                          uint16_t *value) {
-    static uint8_t tx[1] = {0,}, rx[2];
+  error_t e = i2c_master_transaction_write_read(device->i2c, device->address,
+                                                tx, 1, rx, 2);
+  if (e != E_SUCCESS) {
+    return e;
+  }
 
-    tx[0] = address;
-    bool s = i2c_master_transaction_write_read(device->i2c, device->address,
-                                                 tx, 1, rx, 2);
-    *value = rx[0] << 8 | rx[1];
-    return s;
+  *value = (rx[0] << 8u) + rx[1];
+  return e;
 }
 
-bool ina219_write_register(ina219_device *device,
-                              ina219_register address,
-                              uint16_t new_value)
-{
-    static uint8_t tx[3] = {0, };
+static error_t ina219_write_register(const ina219_device *device,
+                                     ina219_register address,
+                                     uint16_t new_value) {
+  if (!device) {
+    return E_NULL_PTR;
+  }
 
-    tx[0] = address;
-    tx[1] = (uint8_t) (new_value >> 8);
-    tx[2] = (uint8_t) (new_value & 0xFF);
-    bool s = i2c_master_write(device->i2c, device->address, tx, 3);
+  uint8_t tx[3] = {
+      address,
+      (uint8_t)(new_value >> 8u),
+      (uint8_t)(new_value & 0xFFu),
+  };
 
-    return s;
+  error_t s = i2c_master_write(device->i2c, device->address, tx, 3);
+
+  return s;
 }
 
-bool ina219_setup(ina219_device **dev,
-                  uint32_t i2c,
-                  uint8_t address) {
-    *dev = (ina219_device *) malloc(sizeof(ina219_device));
-    (*dev)->i2c = i2c;
-    (*dev)->address = address;
+error_t ina219_init(ina219_device *device, uint32_t i2c, uint8_t address) {
+  if (!device) {
+    return E_NULL_PTR;
+  }
 
-    return false;
-}
+  (*device).i2c = i2c;
+  (*device).address = address;
 
+  ina219_config config;
+  error_t e;
+  e = ina219_read_register(device, ina219_register_configuration, &config.raw);
+  if (e != E_SUCCESS) {
+    return e;
+  }
 
-bool ina219_init(ina219_device *device)
-{
-    ina219_config config;
-    ina219_read_register(device, ina219_register_configuration, &config.raw);
-
-    // Check if device requires reset
-    if (config.raw != 0x399F) {
-        usart1_print("Restarting device\r\n");
-        config.rst = 1;
-        ina219_write_register(device, ina219_register_configuration, config.raw);
-
-        do {
-            // Wait until device is ready
-            ina219_read_register(device, ina219_register_configuration, &config.raw);
-        } while (config.raw != 0x399F);
+  // Check if device requires reset
+  if (config.raw != 0x399F) {
+    usart1_print("Restarting device\r\n");
+    config.rst = 1;
+    e = ina219_write_register(device, ina219_register_configuration,
+                              config.raw);
+    if (e != E_SUCCESS) {
+      return e;
     }
 
-    config = (ina219_config) {
-        .brng = 0b1, // Bus Voltage Range - 32V
-        .pga = 0b11, // PGA gain and range - +8 / 320 mA
-        .badc = 0b1111, // Bus ADC Settings - 128x12bit samples / 68.1 ms conversion time
-        .sadc = 0b1111, // Shunt ADC Settings - 128x12bit samples / 68.1 ms conversion time
-        .mode = 0b111, // Mode - Shunt and Bus, Continuous
-    };
-    usart1_printf("New configuration: %X\r\n", config.raw);
+    do {
+      // Wait until device is ready
+      e = ina219_read_register(device, ina219_register_configuration,
+                               &config.raw);
+      if (e != E_SUCCESS) {
+        return e;
+      }
+    } while (config.raw != 0x399F);
+  }
 
-    ina219_write_register(device, ina219_register_configuration, config.raw);
+  config = (ina219_config){
+      .brng = 0b1,    // Bus Voltage Range - 32V
+      .pga = 0b11,    // PGA gain and range - +8 / 320 mA
+      .badc = 0b1111, // Bus ADC Settings - 128x12bit samples / 68.1 ms
+                      // conversion time
+      .sadc = 0b1111, // Shunt ADC Settings - 128x12bit samples / 68.1 ms
+                      // conversion time
+      .mode = 0b111,  // Mode - Shunt and Bus, Continuous
+  };
+  usart1_printf("New configuration: %X\r\n", config.raw);
 
-    return 0;
+  e = ina219_write_register(device, ina219_register_configuration, config.raw);
+
+  return e;
 }
 
-bool ina219_perform_calibration(ina219_device *device)
-{
-    return ina219_write_register(device, ina219_register_calibration,
-                                 device->calibration_register);
+error_t ina219_perform_calibration(ina219_device *device) {
+  return ina219_write_register(device, ina219_register_calibration,
+                               device->calibration_register);
 }
 
-void ina219_get_bus_voltage(ina219_device *device) {
-    // Read bus voltage
-    uint16_t val;
-    ina219_read_register(device, ina219_register_bus_voltage, &val);
+error_t ina219_get_bus_voltage(ina219_device *device) {
+  if (!device) {
+    return E_NULL_PTR;
+  }
 
-    // TODO: Check and handle overflows
-    device->raw_bus_voltage = val >> 3;
+  // Read bus voltage
+  uint16_t val;
+  error_t e = ina219_read_register(device, ina219_register_bus_voltage, &val);
+  if (e != E_SUCCESS) {
+    return e;
+  }
 
+  // TODO: Check and handle overflows
+  device->raw_bus_voltage = val >> 3u;
 
-    // 1 LSB = 4mV (value from datasheet)
-    device->bus_voltage = device->raw_bus_voltage * 4 / 1000.0f;
+  // 1 LSB = 4mV (value from datasheet)
+  device->bus_voltage = device->raw_bus_voltage * 4 / 1000.0f;
+
+  return e;
 }
 
-void ina219_get_shunt_voltage(ina219_device *device) {
-    // Read drop of voltage across shunt
-    ina219_read_register(device, ina219_register_shunt_voltage,
-                         (uint16_t *) &device->raw_shunt_voltage);
+error_t ina219_get_shunt_voltage(ina219_device *device) {
+  if (!device) {
+    return E_NULL_PTR;
+  }
 
-    device->shunt_voltage = device->raw_shunt_voltage / 1000.0f;
+  // Read drop of voltage across shunt
+  error_t e = ina219_read_register(device, ina219_register_shunt_voltage,
+                                   (uint16_t *)&device->raw_shunt_voltage);
+  if (e != E_SUCCESS) {
+    return e;
+  }
+
+  device->shunt_voltage = device->raw_shunt_voltage / 1000.0f;
+  return e;
 }
 
-void ina219_get_current(ina219_device *device) {
-    ina219_read_register(device, ina219_register_current,
-                         (uint16_t *) &device->raw_current);
+error_t ina219_get_current(ina219_device *device) {
+  if (!device) {
+    return E_NULL_PTR;
+  }
 
-    // 1 LSB = 0.1 mA (calculated value)
-    device->current = device->raw_current * 0.1f;
+  error_t e = ina219_read_register(device, ina219_register_current,
+                                   (uint16_t *)&device->raw_current);
+  if (e != E_SUCCESS) {
+    return e;
+  }
+
+  // 1 LSB = 0.1 mA (calculated value)
+  device->current = device->raw_current * 0.1f;
+  return e;
 }
 
-void ina219_get_power(ina219_device *device) {
-    ina219_read_register(device, ina219_register_power,
-                         (uint16_t *) &device->raw_power);
+error_t ina219_get_power(ina219_device *device) {
+  if (!device) {
+    return E_NULL_PTR;
+  }
 
-    // 1 LSB = 2 mW (calculated value) = 20 * Current LSB
-    device->power = device->raw_power * 2;
+  error_t e = ina219_read_register(device, ina219_register_power,
+                                   (uint16_t *)&device->raw_power);
+  if (e != E_SUCCESS) {
+    return e;
+  }
+
+  // 1 LSB = 2 mW (calculated value) = 20 * Current LSB
+  device->power = device->raw_power * 2;
+  return e;
 }
 
-void ina219_get_all_readings(ina219_device *device) {
-    ina219_get_bus_voltage(device);
-    ina219_get_shunt_voltage(device);
-    ina219_get_current(device);
-    ina219_get_power(device);
-}
+error_t ina219_get_all_readings(ina219_device *device) {
+  error_t e;
+  e = ina219_get_bus_voltage(device);
+  if (e != E_SUCCESS) {
+    return e;
+  }
 
+  e = ina219_get_shunt_voltage(device);
+  if (e != E_SUCCESS) {
+    return e;
+  }
+
+  e = ina219_get_current(device);
+  if (e != E_SUCCESS) {
+    return e;
+  }
+
+  e = ina219_get_power(device);
+  return e;
+}

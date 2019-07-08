@@ -50,12 +50,11 @@ typedef struct {
     };
 } ina219_config;
 
-bool ina219_setup(ina219_device **dev, uint32_t i2c, uint8_t address);
-bool ina219_init(ina219_device* device);
-bool ina219_perform_calibration(ina219_device *device);
+error_t ina219_init(ina219_device* device, uint32_t i2c, uint8_t address);
+error_t ina219_perform_calibration(ina219_device *device);
 
-void ina219_get_bus_voltage(ina219_device *device);
-void ina219_get_shunt_voltage(ina219_device *device);
-void ina219_get_current(ina219_device *device);
-void ina219_get_power(ina219_device *device);
-void ina219_get_all_readings(ina219_device *device);
+error_t ina219_get_bus_voltage(ina219_device *device);
+error_t ina219_get_shunt_voltage(ina219_device *device);
+error_t ina219_get_current(ina219_device *device);
+error_t ina219_get_power(ina219_device *device);
+error_t ina219_get_all_readings(ina219_device *device);
