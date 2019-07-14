@@ -1,14 +1,9 @@
-#ifndef __HD44780_I2C_H__
-#define __HD44780_I2C_H__
-#include "stdbool.h"
+#pragma once
 
-#include <stm32f10x.h>
-#include <stm32f10x_tim.h>
-
+#include "common_lib/i2c.h"
 #include "common_lib/utils.h"
-#include "common_lib/i2c_dma.h"
 
-#define hd44780_address 0x27
+#define HD44780_ADDRESS 0x27
 
 #define HD44780_SCROLL_RIGHT 0x1E
 #define HD44780_SCROLL_LEFT 0x18
@@ -22,14 +17,21 @@
 #define HD44780_DISPLAY_SHOW 0x0C
 #define HD44780_DISPLAY_ERASE 0x01
 
-void hd44780_init(TIM_TypeDef *timer);
-void hd44780_cgram_write(u8 pos, u8 data_[8]);
-void hd44780_print(char *string);
-void hd44780_go_to_line(u8 line);
-void hd44780_go_to(u8 row, u8 col);
-void hd44780_cmd(u8 cmd);
-void hd44780_char(u8 c);
-void hd44780_backlight(bool new_value);
+#define HD44780_BACKLIGHT (1u << 3u)
+#define HD44780_EN (1u << 2u)
+#define HD44780_RW (1u << 1u)
+#define HD44780_RS (1u << 0u)
 
+typedef struct {
+  i2c_device device;
+  uint32_t timer;
+} hd44780_device;
 
-#endif // __HD44780_I2C_H__
+error_t hd44780_init(hd44780_device *device, uint32_t i2c, uint8_t address,
+                  uint32_t timer);
+error_t hd44780_cgram_write(const hd44780_device *device, uint8_t pos,
+                            uint8_t data_[8]);
+error_t hd44780_print(const hd44780_device *device, const char *string);
+error_t hd44780_go_to_line(const hd44780_device *device, uint8_t line);
+error_t hd44780_go_to(const hd44780_device *device, uint8_t row, uint8_t col);
+error_t hd44780_backlight(const hd44780_device *device, bool new_value);

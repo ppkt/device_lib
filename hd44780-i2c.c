@@ -13,136 +13,180 @@
  * 0x08 - Hide display
  * 0x0C - Show display with invisible cursor
  * 0x01 - Clear display
- *
  */
 
-u8 backlight = 0 << 3;
-u8 en        = 1 << 2;
-u8 rw        = 1 << 1;
-u8 rs        = 1 << 0;
-TIM_TypeDef *timer;
-uint8_t hd44780_data[4] = {0x00, 0x00, 0x00, 0x00};
+static uint8_t hd44780_data[4] = {0x00, 0x00, 0x00, 0x00};
 
-void hd44780_send(u8 cmd, bool set_rs) {
-    u8 rs_ = 0;
-    if (set_rs)
-    	rs_ = rs;
+static error_t hd44780_send(const hd44780_device *device, uint8_t cmd,
+                            bool set_rs) {
+  if (!device) {
+    return E_NULL_PTR;
+  }
 
-    hd44780_data[0] = (cmd & 0xF0) | backlight | en | rs_;
-    hd44780_data[1] = (cmd & 0xF0) | backlight;
-    hd44780_data[2] = (cmd & 0x0F) << 4 | backlight | en | rs_;
-    hd44780_data[3] = (cmd & 0x0F) << 4 | backlight;
-    I2C_Master_BufferWrite(I2C1, hd44780_data, 4, Polling, hd44780_address << 1);
+  uint8_t rs_ = 0;
+  if (set_rs)
+    rs_ = HD44780_RS;
+
+  hd44780_data[0] = (cmd & 0xF0u) | HD44780_BACKLIGHT | HD44780_EN | rs_;
+  hd44780_data[1] = (cmd & 0xF0u) | HD44780_BACKLIGHT;
+  hd44780_data[2] = (cmd & 0x0Fu) << 4u | HD44780_BACKLIGHT | HD44780_EN | rs_;
+  hd44780_data[3] = (cmd & 0x0Fu) << 4u | HD44780_BACKLIGHT;
+  return i2c_master_write(device->device.i2c, device->device.address,
+                          hd44780_data, 4);
 }
 
-void hd44780_char(u8 cmd) {
-    hd44780_send(cmd, true);
-    delay_us(timer, 200);
+static error_t hd44780_char(const hd44780_device *device, uint8_t cmd) {
+  if (!device) {
+    return E_NULL_PTR;
+  }
+
+  check_error(hd44780_send(device, cmd, true));
+
+  delay_us(device->timer, 200);
+  return E_SUCCESS;
 }
 
-void hd44780_cmd(u8 cmd) {
-    hd44780_send(cmd, false);
-    delay_us(timer, 5000);
+static error_t hd44780_cmd(const hd44780_device *device, uint8_t cmd) {
+  if (!device) {
+    return E_NULL_PTR;
+  }
+
+  check_error(hd44780_send(device, cmd, false));
+
+  delay_us(device->timer, 5000);
+  return E_SUCCESS;
 }
 
-void hd44780_print(char *string) {
-    char* ptr = string;
-    while (*(ptr) != 0) {
-        hd44780_char(*ptr++);
-    };
+error_t hd44780_print(const hd44780_device *device, const char *string) {
+  if (!device || !string) {
+    return E_NULL_PTR;
+  }
+
+  const char *ptr = string;
+  while (*(ptr) != 0) {
+    check_error(hd44780_char(device, *ptr++));
+  }
+  return E_SUCCESS;
 }
 
-void hd44780_backlight(bool new_value) {
-    backlight = new_value << 3;
-    I2C_Master_BufferRead(I2C1, hd44780_data, 1, Polling, hd44780_address << 1);
-    hd44780_data[0] |= backlight;
-    I2C_Master_BufferWrite(I2C1, hd44780_data, 1, Polling, hd44780_address << 1);
+error_t hd44780_backlight(const hd44780_device *device, bool new_value) {
+  if (!device) {
+    return E_NULL_PTR;
+  }
+
+  uint8_t backlight = new_value << 3u;
+  check_error(i2c_master_transaction_write_read(
+      device->device.i2c, device->device.address, NULL, 0, hd44780_data, 1));
+
+  hd44780_data[0] |= backlight;
+  check_error(i2c_master_transaction_write_read(
+      device->device.i2c, device->device.address, hd44780_data, 1, NULL, 0));
+  return E_SUCCESS;
 }
 
-void hd44780_go_to_line(u8 line) {
-    switch(line) {
-        case 0:
-            hd44780_cmd(0x80);
-            break;
-        case 1:
-            hd44780_cmd(0xC0);
-            break;
-        case 2:
-            hd44780_cmd(0x94);
-            break;
-        case 3:
-            hd44780_cmd(0xD4);
-            break;
-        default:
-            break;
-    }
+error_t hd44780_go_to_line(const hd44780_device *device, uint8_t line) {
+  if (!device) {
+    return E_NULL_PTR;
+  }
+
+  switch (line) {
+  case 0:
+    check_error(hd44780_cmd(device, 0x80));
+    break;
+  case 1:
+    check_error(hd44780_cmd(device, 0xC0));
+    break;
+  case 2:
+    check_error(hd44780_cmd(device, 0x94));
+    break;
+  case 3:
+    check_error(hd44780_cmd(device, 0xD4));
+    break;
+  default:
+    hacf();
+  }
+  return E_SUCCESS;
 }
 
-void hd44780_go_to(u8 row, u8 col) {
-    hd44780_go_to_line(row);
-    u8 i = 0;
-    while (i++ < col)
-        hd44780_cmd(HD44780_MOVE_CURSOR_RIGHT);
+error_t hd44780_go_to(const hd44780_device *device, uint8_t row, uint8_t col) {
+  if (!device) {
+    return E_NULL_PTR;
+  }
+
+  check_error(hd44780_go_to_line(device, row));
+
+  uint8_t i = 0;
+  while (i++ < col) {
+    check_error(hd44780_cmd(device, HD44780_MOVE_CURSOR_RIGHT));
+  }
+  return E_SUCCESS;
 }
 
-void hd44780_cgram_write(u8 pos, u8 data_[8]) {
-    if (pos > 7) {
-        return;
-    }
-    pos = 64 + pos * 8;
-    hd44780_cmd(pos);
-    u8 i;
-    for (i = 0; i < 8; ++i) {
-    	hd44780_send(data_[i], true);
-    }
+error_t hd44780_cgram_write(const hd44780_device *device, uint8_t pos,
+                            uint8_t data_[8]) {
+  if (!device) {
+    return E_NULL_PTR;
+  }
+
+  if (pos > 7) {
+    return E_VALUE_INVALID;
+  }
+
+  pos = 64 + pos * 8;
+  check_error(hd44780_cmd(device, pos));
+
+  uint8_t i;
+  for (i = 0; i < 8; ++i) {
+    check_error(hd44780_send(device, data_[i], true));
+  }
+
+  return E_SUCCESS;
 }
 
-void hd44780_init(TIM_TypeDef *t) {
-    timer = t;
-    // Setup clock
-    setup_delay_timer(timer);
+error_t hd44780_init(hd44780_device *device, uint32_t i2c, uint8_t address,
+                     uint32_t timer) {
+  if (!device) {
+    return E_NULL_PTR;
+  }
 
-    hd44780_data[0] = 0x00 | backlight;
-    hd44780_data[1] = 0x00 | backlight;
+  check_error(i2c_check_arguments(i2c, address));
 
-    // Init I2C
-    I2C_LowLevel_Init(I2C1);
+  device->device.i2c = i2c;
+  device->device.address = address;
+  device->timer = timer;
 
-    // Reset all
-    I2C_Master_BufferWrite(I2C1, hd44780_data, 1, Polling, hd44780_address << 1);
+  // Setup clock
+  setup_delay_timer(timer);
 
-    hd44780_cmd(0x03);
-    delay_us(timer, 5000);
-    hd44780_cmd(0x03);
-    delay_us(timer, 100);
-    hd44780_cmd(HD44780_MOVE_TO_HOME);
-    delay_us(timer, 200);
+  hd44780_data[0] = 0x00u | HD44780_BACKLIGHT;
 
-    hd44780_cmd(0x28); // 4 bit mode
-    hd44780_cmd(0x06); // set direction of cursor to right
-    hd44780_cmd(HD44780_DISPLAY_ERASE); // clear display, go to 0x0
-//    hd44780_cmd(0x0E); // turn on display, set solid cursor
-    hd44780_cmd(HD44780_DISPLAY_SHOW); // turn on display, set invisiblecursor
+  // Reset all
+  check_error(i2c_master_write(device->device.i2c, device->device.address,
+                               hd44780_data, 1));
 
-//    u8 arr[] = {0,10,31,31,14,4,0,0};
-//    u8 arr2[]= {0,10,21,17,10,4,0,0};
+  check_error(hd44780_cmd(device, 0x03));
+  delay_us(device->timer, 5000);
 
-//    hd44780_cgram_write(0, arr);
-//    hd44780_cgram_write(1, arr2);
+  check_error(hd44780_cmd(device, 0x03));
+  delay_us(device->timer, 100);
 
-    hd44780_cmd(0x01); // clear display, go to 0x0
+  check_error(hd44780_cmd(device, HD44780_MOVE_TO_HOME));
+  delay_us(device->timer, 200);
 
-//    hd44780_backlight(initial_backlight);
-//    hd44780_print("Linia 0");
-//    hd44780_go_to_line(1);
-//    hd44780_print("Linia 1");
-//    hd44780_go_to_line(2);
-//    hd44780_print("Linia 2");
-//    hd44780_go_to_line(3);
-//    hd44780_print("Linia 3");
+  // 4 bit mode
+  check_error(hd44780_cmd(device, 0x28));
 
-//    hd44780_char(0);
-//    hd44780_char(1);
+  // set direction of cursor to right
+  check_error(hd44780_cmd(device, 0x06));
+
+  // clear display, go to 0x0
+  check_error(hd44780_cmd(device, HD44780_DISPLAY_ERASE));
+
+  // turn on display, set invisiblecursor
+  check_error(hd44780_cmd(device, HD44780_DISPLAY_SHOW));
+
+  // clear display, go to 0x0
+  check_error(hd44780_cmd(device, 0x01));
+
+  return E_SUCCESS;
 }
-
-

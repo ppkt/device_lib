@@ -6,6 +6,7 @@ add_library(device_lib STATIC
     ds1307.c
     ds3231.c
     ds_common.c
+    hd44780-i2c.c
     ina219.c
     max7219.c
     nrf24l01.c
