@@ -96,7 +96,7 @@ error_t ina219_get_bus_voltage(ina219_device *device) {
   }
 
   // Read bus voltage
-  uint16_t val;
+  uint16_t val = 0;
   check_error(ina219_read_register(device, ina219_register_bus_voltage, &val));
 
   // TODO: Check and handle overflows
