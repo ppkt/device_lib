@@ -97,3 +97,62 @@ error_t ssd1306_print_buffer(ssd1306_device *device) {
   }
   return E_SUCCESS;
 }
+
+// render only fragment of buffer, bounded by provided points
+error_t ssd1306_partial_print_buffer(ssd1306_device *device,
+                                     const gfx_point *p1, const gfx_point *p2) {
+  if (!device || !p1 || !p2) {
+    return E_NULL_PTR;
+  }
+
+  gfx_point _p1, _p2;
+  check_error(gfx_min_max_point(p1, p2, &_p1, &_p2));
+
+  uint8_t page_min = _p1.y / 8, page_max = _p2.y / 8;
+  uint8_t pages = page_max - page_min + 1;
+  uint16_t columns = _p2.x - _p1.x + 1;
+
+  uint8_t i = 0;
+  device->tx[i++] = SSD1306_ADDRESSING_MODE;
+  device->tx[i++] = SSD1306_PAGE_ADDR;
+  device->tx[i++] = page_min;
+  device->tx[i++] = page_max;
+
+  device->tx[i++] = SSD1306_COLUMN_ADDR;
+  device->tx[i++] = _p1.x;
+  device->tx[i++] = _p2.x;
+  check_error(
+      i2c_master_write(device->dev.i2c, device->dev.address, device->tx, i));
+
+  device->tx[0] = 0x40;
+  uint16_t bytes_sent = 0;
+  uint16_t bytes_to_sent = columns * pages;
+
+  // create and fill temporary buffer to handle data to send
+  uint8_t *buffer = malloc(sizeof(uint8_t) * bytes_to_sent);
+  uint16_t buffer_offset = 0;
+  for (uint8_t page = page_min; page <= page_max; ++page) {
+    memcpy(buffer + buffer_offset,
+           &device->buffer[page * device->width + _p1.x], columns);
+    buffer_offset += columns;
+  }
+
+  uint8_t size = 0;
+  error_t e;
+  while (bytes_to_sent) {
+    size = min(32, bytes_to_sent);
+    memcpy(&device->tx[1], buffer + bytes_sent, size);
+    e = i2c_master_write(device->dev.i2c, device->dev.address, device->tx,
+                         size + 1);
+    if (e != E_SUCCESS) {
+      free(buffer);
+      return e;
+    }
+
+    bytes_to_sent -= size;
+    bytes_sent += size;
+  };
+
+  free(buffer);
+  return E_SUCCESS;
+}
