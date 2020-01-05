@@ -59,7 +59,7 @@ error_t bh1750fvi_read_single_shot(const i2c_device *dev,
   uint8_t rx[2];
   i2c_transfer7(dev->i2c, dev->address, NULL, 0, rx, sizeof_a(rx));
   uint16_t reading = (rx[0] << 8u) + rx[1];
-  *val = reading / 1.2;
+  *val = (float)reading / 1.2f;
 
   return E_SUCCESS;
 }
