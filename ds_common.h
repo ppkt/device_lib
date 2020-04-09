@@ -1,7 +1,6 @@
 #pragma once
 
 #include <common_lib/i2c.h>
-#include <stdint-gcc.h>
 #include <time.h>
 
 /**
