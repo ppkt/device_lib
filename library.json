@@ -1,0 +1,12 @@
+{
+  "name": "device_lib",
+  "version": "1.0.0",
+  "frameworks": "libopencm3",
+  "dependencies": {
+    "name": "common_lib"
+  },
+  "build": {
+    "includeDir": ".",
+    "srcDir": "."
+  }
+}

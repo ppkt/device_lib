@@ -1,4 +1,4 @@
-add_library(device_lib STATIC
+add_library(. STATIC
     at24cX.c
     ads1115.c
     bh1750fvi.c
@@ -11,16 +11,17 @@ add_library(device_lib STATIC
     max7219.c
     nrf24l01.c
     ssd1306.c
+    w5500.c
     )
 
-target_include_directories(device_lib PUBLIC .)
+target_include_directories(. PUBLIC ..)
 
-target_link_libraries(device_lib
+target_link_libraries(.
     common_lib
     )
 
 if (${CPU} STREQUAL STM32F0)
-    target_link_libraries(device_lib opencm3_stm32f0)
+    target_link_libraries(. opencm3_stm32f0)
 elseif (${CPU} STREQUAL STM32F1)
-    target_link_libraries(device_lib opencm3_stm32f1)
+    target_link_libraries(. opencm3_stm32f1)
 endif ()
