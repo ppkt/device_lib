@@ -12,6 +12,7 @@ add_library(. STATIC
     nrf24l01.c
     ssd1306.c
     w5500.c
+    si4703.c
     )
 
 target_include_directories(. PUBLIC ..)
