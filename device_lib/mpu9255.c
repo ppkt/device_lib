@@ -198,8 +198,7 @@
 //    int16_t *accelerometer_data = calloc(3, sizeof(uint16_t));
 //
 //    for (uint8_t i = 0; i < 3; ++i) {
-//        accelerometer_data[i] += raw_accelerometer_data[2 * i] << 8 | \
-//                                 raw_accelerometer_data[2 * i + 1];
+//        accelerometer_data[i] += raw_accelerometer_data[2 * i] << 8 | raw_accelerometer_data[2 * i + 1];
 //    }
 //
 //    free(raw_accelerometer_data);
@@ -210,8 +209,7 @@
 //    uint8_t *raw_gyroscope_data = i2c_readbytes(device, MPU9255_GYRO_XOUT_H, 6);
 //    int16_t *gyroscope_data = calloc(3, sizeof(uint16_t));
 //    for (uint8_t i = 0; i < 3; ++i) {
-//        gyroscope_data[i] += raw_gyroscope_data[2 * i] << 8 | \
-//                             raw_gyroscope_data[2 * i + 1];
+//        gyroscope_data[i] += raw_gyroscope_data[2 * i] << 8 | raw_gyroscope_data[2 * i + 1];
 //    }
 //    free(raw_gyroscope_data);
 //    return gyroscope_data;
