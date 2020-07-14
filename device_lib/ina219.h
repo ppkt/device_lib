@@ -31,12 +31,12 @@ typedef struct {
     uint16_t raw;
     struct __attribute__((packed)) {
       ina219_mode mode : 3;
-      uint8_t sadc : 4;
-      uint8_t badc : 4;
+      uint16_t sadc : 4;
+      uint16_t badc : 4;
       ina219_pga pga : 2;
-      uint8_t brng : 1;
-      uint8_t _ : 1;
-      uint8_t rst : 1;
+      uint16_t brng : 1;
+      uint16_t _ : 1;
+      uint16_t rst : 1;
     };
   };
 } ina219_config;
