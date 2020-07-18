@@ -44,7 +44,7 @@ error_t ina219_init(ina219_device *device, uint32_t i2c, uint8_t address) {
 
   // Check if device requires reset
   if (device->config.raw != 0x399F) {
-    usart1_print("Restarting device\r\n");
+    debug_print("Restarting device\r\n");
     device->config.rst = 1;
     check_error(ina219_write_register(device, ina219_register_configuration,
                                       device->config.raw));
@@ -78,7 +78,6 @@ error_t ina219_write_config(ina219_device *device) {
     return E_NULL_PTR;
   }
 
-  usart1_printf("New configuration: %X\r\n", device->config.raw);
   check_error(ina219_write_register(device, ina219_register_configuration,
                                     device->config.raw));
 
