@@ -31,11 +31,11 @@ error_t bme280_init(uint32_t i2c, bme280_device *device) {
   device->standby_duration = t_0_5;
 
   bme280_reset(device);
-  usart_printf(USART1, "Reset completed\r\n");
+  debug_print("Reset completed");
   if (!bme280_check_presence(device)) {
     hacf();
   }
-  usart_printf(USART1, "Device is present\r\n");
+  debug_print("Device is present");
 
   return E_SUCCESS;
 }
@@ -45,8 +45,6 @@ error_t bme280_commit(bme280_device *device) {
   // Set humidity oversampling
   tx[0] = ctrl_hum;
   tx[1] = device->humidity_oversampling & 0b111;
-  usart1_print("CTRL_HUM: ");
-  print_variable_hex(tx[1]);
   i2c_transfer7(device->i2c_dev.i2c, device->i2c_dev.address, tx, 2, NULL, 0);
 
   // Set mode, pressure and temperature oversampling
@@ -54,16 +52,12 @@ error_t bme280_commit(bme280_device *device) {
   tx[1] = (device->mode & 0b11u) |
           (device->pressure_oversampling & 0b111u) << 2u |
           (device->temperature_oversampling & 0b111u) << 5u;
-  usart1_print("CTRL_MEAS: ");
-  print_variable_hex(tx[1]);
   i2c_transfer7(device->i2c_dev.i2c, device->i2c_dev.address, tx, 2, NULL, 0);
 
   // Set config
   tx[0] = config;
   tx[1] = (device->filter_coefficient & 0b111u) << 2u |
           (device->standby_duration & 0b111u) << 5u;
-  usart1_print("CONFIG: ");
-  print_variable_hex(tx[1]);
   i2c_transfer7(device->i2c_dev.i2c, device->i2c_dev.address, tx, 2, NULL, 0);
   return E_SUCCESS;
 }
@@ -95,8 +89,8 @@ error_t bme280_load_compensation_data(bme280_device *device) {
   tx[0] = calib26;
   i2c_transfer7(device->i2c_dev.i2c, device->i2c_dev.address, tx, 1, _rx, 7);
 
-  usart1_printf("%x %x %x %x %x %x\r\n", _rx[0], _rx[1], _rx[2], _rx[3], _rx[4],
-                _rx[5], _rx[6]);
+  debug_printf("%x %x %x %x %x %x", _rx[0], _rx[1], _rx[2], _rx[3], _rx[4],
+               _rx[5], _rx[6]);
 
   device->compensation_data.H2 = _rx[0] | _rx[1] << 8;
   device->compensation_data.H3 = _rx[2];
