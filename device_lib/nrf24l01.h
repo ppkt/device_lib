@@ -6,8 +6,8 @@
 #include "string.h"
 
 #include "common_lib/spi.h"
-#include "common_lib/utils.h"
 #include "common_lib/usart.h"
+#include "common_lib/utils.h"
 
 // Commands
 #define R_REGISTER 0x00u
@@ -144,3 +144,6 @@ void nrf24l01_print_register_map(const nrf24l01_context *ctx);
 
 // Low level API
 // void nrf24l01_ce(nrf24l01_context ctx, bool new_state);
+
+void nrf24l01_print_field(char *name, uint8_t reg, uint8_t pos, uint8_t length,
+                          uint8_t def);
