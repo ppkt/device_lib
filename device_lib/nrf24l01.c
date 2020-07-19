@@ -45,18 +45,13 @@ void nrf24l01_ce(const nrf24l01_context *ctx, bool new_state) {
 }
 
 void nrf24l01_gpio_init(const nrf24l01_context *ctx) {
-  if (ctx->ce.port == GPIOA || ctx->dev.nss.port == GPIOA) {
-    rcc_periph_clock_enable(RCC_GPIOA);
-  }
-  if (ctx->ce.port == GPIOB || ctx->dev.nss.port == GPIOB) {
-    rcc_periph_clock_enable(RCC_GPIOB);
-  }
+  rcc_periph_clock_enable(gpio2rcc(ctx->dev.nss.port));
+  rcc_periph_clock_enable(gpio2rcc(ctx->ce.port));
 
 #ifdef STM32F0
   gpio_mode_setup(ctx->ce.port, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, ctx->ce.gpio);
   gpio_mode_setup(ctx->nss.port, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE,
                   ctx->nss.gpio);
-
 #elif STM32F1
   gpio_set_mode(ctx->ce.port, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_PUSHPULL,
                 ctx->ce.gpio);
@@ -75,14 +70,8 @@ nrf24l01_context *nrf24l01_init(uint32_t spi, const pin *spi_ce,
   ctx->dev.spi = spi;
   ctx->timer = timer;
   ctx->role = role;
-  ctx->ce = (pin){
-      .gpio = spi_ce->gpio,
-      .port = spi_ce->port,
-  };
-  ctx->dev.nss = (pin){
-      .gpio = spi_nss->gpio,
-      .port = spi_nss->port,
-  };
+  ctx->ce = *spi_ce;
+  ctx->dev.nss = *spi_nss;
 
   ctx->tx = malloc(sizeof(uint8_t) * 33);
   ctx->rx = malloc(sizeof(uint8_t) * 33);
